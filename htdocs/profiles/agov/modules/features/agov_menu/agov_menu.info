@@ -1,0 +1,36 @@
+name = aGov Menu
+description = Provides default menus.
+core = 7.x
+package = aGov
+project = agov_menu
+dependencies[] = ctools
+dependencies[] = features
+dependencies[] = menu
+dependencies[] = strongarm
+features[ctools][] = strongarm:strongarm:1
+features[features_api][] = api:2
+features[menu_custom][] = main-menu
+features[menu_custom][] = menu-footer-quick-links
+features[menu_custom][] = menu-footer-sub-menu
+features[menu_custom][] = menu-quick-links
+features[menu_custom][] = user-menu
+features[variable][] = site_map_categories_depth
+features[variable][] = site_map_css
+features[variable][] = site_map_forum_threshold
+features[variable][] = site_map_message
+features[variable][] = site_map_page_title
+features[variable][] = site_map_rss_depth
+features[variable][] = site_map_rss_front
+features[variable][] = site_map_show_count
+features[variable][] = site_map_show_front
+features[variable][] = site_map_show_menus
+features[variable][] = site_map_show_rss_links
+features[variable][] = site_map_show_vocabularies
+features[variable][] = site_map_term_threshold
+
+; Information added by Drupal.org packaging script on 2015-12-09
+version = "7.x-3.0"
+core = "7.x"
+project = "agov"
+datestamp = "1449637755"
+

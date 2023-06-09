@@ -1,0 +1,153 @@
+// scss-lint:disable SpaceAfterComma
+
+// Variables
+//
+// Set variables for this site before a library sets its !default value.
+//
+// Style guide: sass.variables
+
+
+//
+// Browser support
+//
+
+// Support the same browsers as normalize.css v3.
+// Possible keys: chrome, edge, firefox, ie, opera, safari, '*'
+$support-for: (
+  // IE 8-11
+  ie:  8,
+  // The last 4 versions of all other browsers.
+  '*': -4,
+);
+
+
+//
+// Font faces, stacks and sizes.
+//
+
+// The font size set on the root html element.
+$base-font-size:    16px;
+
+// The base line height determines the basic unit of vertical rhythm.
+$base-line-height:  24px;
+
+// The font sizes for h1-h6 expressed as tee shirt sizes.
+$font-size: (
+  xxl:              32px,
+  xl:               24px,
+  l:                20px,
+  m:                $base-font-size,
+  s:                14px,
+  xs:               10px
+);
+
+// Output a horizontal grid to help with debugging typography.
+$typey-debug: false;
+
+// The length unit in which to output font size and margin values.
+// Supported values: px, em, rem.
+$base-unit:         'rem';
+
+// px fallbacks for rem units are needed for IE 8 and earlier.
+$rem-fallback:      if(support-for(ie, 8), true, false);
+
+
+// The following font family declarations use widely available fonts.
+// A user's web browser will look at the comma-separated list and will
+// attempt to use each font in turn until it finds one that is available
+// on the user's computer. The final "generic" font (sans-serif, serif or
+// monospace) hints at what type of font to use if the web browser doesn't
+// find any of the fonts in the list.
+
+// Serif font stacks.
+$times-new-roman: 'Times New Roman', Times, Georgia, 'DejaVu Serif', serif;
+$times:           Times, 'Times New Roman', Georgia, 'DejaVu Serif', serif;
+$georgia:         Georgia, 'Times New Roman', 'DejaVu Serif', serif;
+
+// Sans-serif font stacks.
+$verdana:         Verdana, Tahoma, 'DejaVu Sans', sans-serif;
+$tahoma:          Tahoma, Verdana, 'DejaVu Sans', sans-serif;
+$helvetica:       Helvetica, Arial, 'Nimbus Sans L', sans-serif;
+$arial:           Arial, Helvetica, 'Nimbus Sans L', sans-serif;
+$impact:          Impact, 'Arial Narrow', Helvetica, sans-serif;
+
+// Monospace font stacks.
+// For an explanation of why "sans-serif" is at the end of this list, see
+// http://meyerweb.com/eric/thoughts/2010/02/12/fixed-monospace-sizing/
+$menlo:           Menlo, 'DejaVu Sans Mono', 'Ubuntu Mono', Courier, 'Courier New', monospace, sans-serif;
+
+// Now create some variables using the font stacks we want on this site.
+$font-body:       $verdana;
+$font-monospace:  $menlo;
+$font-watermark:  $impact;
+
+
+// Breakpoints
+//
+// Use the `respond-to()` mixin to use named breakpoints. Documentation is
+// available in the [Breakpoint wiki
+// pages](https://github.com/at-import/breakpoint/wiki/Respond-To).
+//
+// Style guide: sass.variables.breakpoints
+
+@include add-breakpoint(xxxs, (333px, 'no-query' true));
+@include add-breakpoint(xxs,  (444px, 'no-query' true));
+@include add-breakpoint(xs,   (555px, 'no-query' true));
+@include add-breakpoint(s,    (666px, 'no-query' true));
+@include add-breakpoint(m,    (777px, 'no-query' true));
+@include add-breakpoint(l,    (888px, 'no-query' true));
+@include add-breakpoint(xl,   (999px, 'no-query' true));
+@include add-breakpoint(xxl,  (1111px));
+@include add-breakpoint(xxxl, (1222px));
+
+// Output media queries where the above px are converted to ems.
+// @include breakpoint-set('to ems', true);
+
+
+//
+// Zen grids
+//
+
+// These are needed for all breakpoints on all layouts.
+$zen-auto-include-grid-item-base: false;
+$zen-box-sizing: universal-border-box;
+
+// First we set the values we need for the mobile version of our layouts (the
+// version that does _not_ appear inside any @media queries.)
+$zen-columns: 1;
+$zen-gutters: 40px;
+
+// Then we set the values we need for each of the layouts at larger media query
+// sizes. Note how the names of the layouts match the names of our breakpoints
+// above. That allows a single zen-respond-to() to both use the proper item
+// from $zen-layouts and from $breakpoints.
+$zen-layouts: (
+  m: (
+    columns: 2,
+    // The gutters in the layouts are larger on mobile.
+    gutters: 25px,
+  ),
+  xl: (
+    columns: 3,
+    gutters: 25px,
+  ),
+);
+
+// See $include-rtl below.
+$zen-rtl-selector: '[dir="rtl"]';
+
+//
+// Misc
+//
+
+// The amount lists, blockquotes and comments are indented.
+$indent-amount: 2 * $base-font-size;
+
+// Drupal RTL support: Rather than include a separate *-rtl.css file, Zen 6 uses
+// Drupal 8's standard [dir='rtl'] selector for RTL language support. You can
+// turn off all RTL CSS by setting the following variable to false.
+$include-rtl: true;
+// Automatically turn off Zen Grids' RTL support if $include-rtl is false.
+@if not $include-rtl {
+  $zen-rtl-selector: false !global;
+}

@@ -1,0 +1,24 @@
+name = Front
+description = Provides default front page views and panels configuration.
+core = 7.x
+package = aGov
+project = agov_front
+dependencies[] = agov_beans
+dependencies[] = agov_core
+dependencies[] = bean_panels
+dependencies[] = ctools
+dependencies[] = page_manager
+dependencies[] = panels_ipe
+dependencies[] = views
+features[ctools][] = page_manager:pages_default:1
+features[ctools][] = views:views_default:3.0
+features[features_api][] = api:2
+features[page_manager_pages][] = front_page
+features[views_view][] = latest_updates
+
+; Information added by Drupal.org packaging script on 2015-12-09
+version = "7.x-3.0"
+core = "7.x"
+project = "agov"
+datestamp = "1449637755"
+

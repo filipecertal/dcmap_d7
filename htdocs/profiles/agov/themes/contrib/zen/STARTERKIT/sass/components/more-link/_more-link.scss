@@ -1,0 +1,49 @@
+// "More" link
+//
+// Styles the "Read more…" and "Help" links common in Drupal.
+//
+// Markup: more-link.hbs
+//
+// Style guide: components.navigation.more-link
+
+.more-link,
+%more-link {
+  text-align: right;
+
+  @include rtl() {
+    text-align: left;
+  }
+
+  &__help-icon {
+    padding: 1px 0 1px 20px;
+    @if support-for(ie, 8) {
+      // IE8 does not support multiple backgrounds, so IE8 will ignore the second
+      // declaration with the SVG. https://css-tricks.com/using-svg/
+      // scss-lint:disable DuplicateProperty
+      background-image: image-url('more-link/more-link__help-icon.png');
+      background-image: image-url('more-link/more-link__help-icon.svg'), none;
+    }
+    @else {
+      background-image: image-url('more-link/more-link__help-icon.svg');
+    }
+    background-position: 0 50%;
+    background-repeat: no-repeat;
+
+    @include rtl() {
+      padding: 1px 20px 1px 0;
+      background-position: 100% 50%;
+    }
+  }
+}
+
+//
+// Drupal selectors.
+//
+
+.more-help-link {
+  @extend %more-link;
+
+  a {
+    @extend %more-link__help-icon;
+  }
+}

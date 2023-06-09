@@ -1,0 +1,620 @@
+<?php
+
+/**
+ * @file
+ * Provides Funnelback search integration.
+ */
+
+define('FUNNELBACK_DEFAULT_NUM_PAGES', 10);
+define('FUNNELBACK_BEST_BETS_CLICK_TYPE', 'FP');
+define('FUNNELBACK_URL_MAX_LENGTH', 80);
+define('FUNNELBACK_DESC_MAX_LENGTH', 180);
+define('FUNNELBACK_TITLE_MAX_LENGTH', 80);
+
+define('FUNNELBACK_API_HTML', 1);
+define('FUNNELBACK_API_XML', 2);
+define('FUNNELBACK_API_JSON', 3);
+
+define('FUNNELBACK_DEBUG_NONE', 'none');
+define('FUNNELBACK_DEBUG_LOG', 'log');
+define('FUNNELBACK_DEBUG_VERBOSE', 'verbose');
+
+define('FUNNELBACK_UI_CLASSIC', 1);
+define('FUNNELBACK_UI_MODERN', 11);
+
+/**
+ * Implements hook_menu().
+ */
+function funnelback_menu() {
+  $items = array();
+  $items['funnelback/search'] = array(
+    'title' => 'Search',
+    'description' => 'Search using Funnelback',
+    'page callback' => 'funnelback_search_view',
+    'access arguments' => array('use funnelback search'),
+  );
+  $items['admin/config/search/funnelback'] = array(
+    'title' => 'Funnelback search',
+    'description' => 'Configure funnelback settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('funnelback_admin_form'),
+    'access arguments' => array('administer funnelback'),
+    'file' => 'funnelback.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_preprocess_html().
+ */
+function funnelback_preprocess_html($theme = NULL) {
+  drupal_add_css(drupal_get_path('module', 'funnelback') . '/funnelback.css');
+}
+
+/**
+ * Implements hook_permission().
+ */
+function funnelback_permission() {
+  return array(
+    'use funnelback search' => array(
+      'title'       => t('Use Funnelback search'),
+      'description' => t('Use the Funnelback search block to make searches and display matching results'),
+    ),
+    'administer funnelback' => array(
+      'title'       => t('Administer Funnelback search settings'),
+      'description' => t('Allows access to change the Funnelback API connection parameters'),
+    ),
+  );
+}
+
+/**
+ * Page callback for funnelback search.
+ */
+function funnelback_search_view() {
+  $params = array();
+  foreach (allowedParameters() as $key => $value) {
+    if (isset($_GET[$key])) {
+      $params[$value] = filter_xss($_GET[$key]);
+    }
+  }
+
+  $results = funnelback_do_query($params);
+  $summary = $results->getResultsSummary();
+  $pager = theme('funnelback_pager', array('summary' => $summary, 'params' => $params));
+  $output = theme('funnelback_results', array('results' => $results, 'pager' => $pager, 'params' => $params));
+  return $output;
+}
+
+/**
+ * Cache search response.
+ *
+ * Need to keep a cache of the search response for the entire page duration,
+ * so blocks can access it.
+ *
+ * @param \Funnelback\Response $response
+ *   A Funnelback Response
+ *
+ * @return \Funnelback\Response
+ *   A Funnelback Response
+ */
+function funnelback_static_response_cache($response = NULL) {
+  static $_response = NULL;
+  if (is_object($response)) {
+    $_response = $response;
+  }
+
+  return $_response;
+}
+
+/**
+ * Semaphore that indicates whether a search has been done.
+ *
+ * Blocks use this later to decide whether they should load or not.
+ *
+ * @param bool|null $searched
+ *   A boolean indicating whether a search has been executed.
+ *
+ * @return bool
+ *   TRUE if a search has been executed.
+ */
+function funnelback_has_searched($searched = NULL) {
+  static $_searched = FALSE;
+  if (is_bool($searched)) {
+    $_searched = $searched;
+  }
+
+  return $_searched;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function funnelback_theme() {
+  return array(
+    'funnelback_results' => array(
+      'arguments' => array('results' => NULL, 'pager' => NULL, 'params' => NULL),
+      'template' => 'funnelback_results',
+    ),
+    'funnelback_contextual_nav_block' => array(
+      'arguments' => array('summary' => NULL, 'facets' => NULL, 'params' => NULL),
+      'template' => 'funnelback_contextual_nav_block',
+    ),
+    'funnelback_pager' => array(
+      'arguments' => array('summary' => NULL, 'params' => NULL),
+      'template' => 'funnelback_pager',
+    ),
+  );
+}
+
+/**
+ * Preprocess function for the funnelback_results template.
+ */
+function funnelback_preprocess_funnelback_results(&$vars) {
+  $results           = $vars['results'];
+  $vars['summary']   = $results->getResultsSummary();
+}
+
+/**
+ * Preprocess function for the funnelback_results pager.
+ */
+function funnelback_preprocess_funnelback_pager(&$vars) {
+  $summary      = $vars['summary'];
+  $params      = $vars['params'];
+  unset($params['start_rank']);
+  $page_size    = intval($summary->getPageSize());
+  $start        = intval($summary->getStart());
+  $i            = 0;
+  $pager_end    = FUNNELBACK_DEFAULT_NUM_PAGES;
+  // If we get bigger than 10 pages, offset the pager numbers.
+  if ($start > $page_size * FUNNELBACK_DEFAULT_NUM_PAGES) {
+    // Round to the nearest 10.
+    $pager_offset = floor($start / FUNNELBACK_DEFAULT_NUM_PAGES / FUNNELBACK_DEFAULT_NUM_PAGES) * FUNNELBACK_DEFAULT_NUM_PAGES;
+    $i            = $pager_offset;
+    $pager_end    = $i + FUNNELBACK_DEFAULT_NUM_PAGES;
+  }
+  $pager = array();
+  $pages = array();
+  while ($i < $pager_end && $i * $page_size < $summary->getTotal()) {
+    // Create the pager title and link.
+    $page          = array();
+    $page['title'] = strval($i + 1);
+    $params['start'] = strval($i * $page_size + 1);
+    $page['link']  = '?' . funnelback_encode_search_params($params);
+
+    // Flag the current page.
+    $current = FALSE;
+    if ($start == ($i * $page_size + 1)) {
+      $current = TRUE;
+    }
+    $page['current'] = $current;
+
+    // Create the previous/next links.
+    if ($current) {
+      $params['start'] = strval(($i - 1) * $page_size + 1);
+      $pager['prev_link'] = '?' . funnelback_encode_search_params($params);
+      $params['start'] = strval(($i + 1) * $page_size + 1);
+      $pager['next_link'] = '?' . funnelback_encode_search_params($params);
+    }
+
+    $pages[] = $page;
+
+    $i++;
+  }
+
+  $pager['pages'] = $pages;
+
+  // Flag if we're on the first page.
+  $pager['first'] = (intval($summary->getStart()) == 1);
+
+  // Flag if we're more than the first lot of pages.
+  if (intval($summary->getStart()) > $page_size * FUNNELBACK_DEFAULT_NUM_PAGES) {
+    $params['start'] = strval(1);
+    $pager['first_link'] = '?' . funnelback_encode_search_params($params);
+  }
+
+  $vars['pager'] = $pager;
+}
+
+/**
+ * Calls the appropriate Funnelback web service interface.
+ *
+ * @param array $params
+ *   The query parameters..
+ *
+ * @return \Funnelback\Response
+ *   The search response.
+ */
+function funnelback_do_query($params) {
+
+  // Get variables.
+  $query = !empty($params['query']) ? $params['query'] : "";
+  $base_url = funnelback_get_base_url();
+  $collection = variable_get('funnelback_collection', 'example-collection');
+  $format = variable_get('funnelback_api_format', FUNNELBACK_API_JSON);
+  switch($format) {
+    case FUNNELBACK_API_JSON:
+      $format = \Funnelback\ClientInterface::JSON_FORMAT;
+      break;
+    case FUNNELBACK_API_XML:
+      $format = \Funnelback\ClientInterface::XML_FORMAT;
+      break;
+    case FUNNELBACK_API_HTML:
+      $format = \Funnelback\ClientInterface::HTML_FORMAT;
+      break;
+  }
+  $profile = variable_get('funnelback_profile', NULL);
+
+
+  // Allow modules to modify the query.
+  drupal_alter('funnelback_keywords', $query);
+
+  // Create an array of client configuration.
+  $config = array(
+    'base_url' => $base_url,
+    'collection' => $collection,
+    'profile' => $profile,
+    'format' => $format,
+  );
+
+  // Allow modules to modify the configuration.
+  drupal_alter('funnelback_config', $config);
+
+  // Rebuild the request parameters.
+  $params['remote_ip'] = ip_address();
+  $params['query'] = $query;
+
+  // Allow modules to modify the query parameters.
+  drupal_alter('funnelback_params', $params);
+
+  // Create the funnelback client.
+  $client = new Funnelback\DrupalClient($config);
+
+  // Call Funnelback via the API.
+  $response = $client->search($params);
+
+  funnelback_debug('Requesting url: %url. Response %response', array(
+    '%url' => $response->getHttpResponse()->url,
+    '%response' => $response->getHttpResponse()->code,
+  ));
+
+  if ($response->getHttpResponse()->code == 200) {
+    funnelback_has_searched(TRUE);
+  }
+  else {
+    funnelback_debug('The search query failed due to "%error".', array(
+      '%error' => $response->getHttpResponse()->code . ' ' . $response->getHttpResponse()->error,
+    ), WATCHDOG_WARNING);
+    return NULL;
+  }
+
+  // Allow modules to modify the response.
+  drupal_alter('funnelback_response', $response);
+
+  // Caching should occur after the alter, otherwise results will be
+  // inconsistent.
+  funnelback_static_response_cache($response);
+
+  return $response;
+}
+
+/**
+ * Return the base URL.
+ *
+ * @return string|null
+ *   The base URL.
+ */
+function funnelback_get_base_url() {
+
+  $base_url = variable_get('funnelback_base_url', 'https://example.funnelback.com/search/');
+  $base_url = rtrim($base_url, '/');
+
+  return $base_url . '/';
+}
+
+/**
+ * Helper to log debug messages.
+ *
+ * @param string $message
+ *   A message, suitable for watchdog().
+ * @param array $args
+ *   (optional) An array of arguments, as per watchdog().
+ * @param int $log_level
+ *   (optional) The watchdog() log level. Defaults to WATCHDOG_DEBUG.
+ */
+function funnelback_debug($message, $args = array(), $log_level = WATCHDOG_DEBUG) {
+
+  $debug = variable_get('funnelback_debug_mode', FUNNELBACK_DEBUG_NONE);
+  if ($debug == FUNNELBACK_DEBUG_LOG) {
+    watchdog('funnelback', $message, $args, $log_level);
+  }
+  elseif ($debug == FUNNELBACK_DEBUG_VERBOSE) {
+    $string = format_string($message, $args);
+    if ($log_level >= WATCHDOG_ERROR) {
+      $message_level = 'error';
+    }
+    else {
+      $message_level = 'status';
+    }
+    drupal_set_message($string, $message_level);
+  }
+}
+
+/**
+ * Format a label.
+ *
+ * @param array $item
+ *   The item.
+ *
+ * @return array
+ *   The item
+ */
+function _funnelback_format_label($item) {
+
+  $item['filetype_label_short'] = '[' . strtoupper($item['filetype']) . ']';
+
+  switch ($item['filetype']) {
+    case 'pdf':
+      $item['filetype_label_long'] = 'PDF';
+      break;
+
+    case 'xls':
+      $item['filetype_label_long'] = 'Microsoft Excel';
+      break;
+
+    case 'ppt':
+      $item['filetype_label_long'] = 'Microsoft Powerpoint';
+      break;
+
+    case 'rtf':
+      $item['filetype_label_long'] = 'Rich Text';
+      break;
+
+    case 'doc':
+    case 'docx':
+      $item['filetype_label_long'] = 'Microsoft Word';
+      break;
+  }
+
+  return $item;
+}
+
+/**
+ * Make sure we only have non web files being displayed as file types.
+ *
+ * I.e. not html, cfm, etc.
+ *
+ * @param string $type
+ *   A file extension
+ *
+ * @return bool
+ *   TRUE if in accepted types.
+ */
+function _funnelback_check_filetype($type) {
+  $accepted_types = array('pdf', 'xls', 'ppt', 'rtf', 'doc', 'docx');
+  if (in_array($type, $accepted_types)) {
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Truncate the display url so it displays on one line.
+ *
+ * @param string $url
+ *   A URL.
+ *
+ * @return string
+ *   The Truncated URL.
+ */
+function _funnelback_truncate_url($url) {
+  // Split the url into bits so we can choose what to keep.
+  $url_arr = parse_url($url);
+  $host = $url_arr['host'];
+  // Always keep the host.
+  $max_len = FUNNELBACK_URL_MAX_LENGTH - strlen($host);
+  $path    = $url_arr['path'];
+  $query   = (!empty($url_arr['query'])) ? $url_arr['query'] : NULL;
+  if (!empty($query)) {
+    $path = $path . '?' . $query;
+  }
+  // Put elipsis in the middle of the path.
+  $path_len = strlen($path);
+  if ($path_len > $max_len) {
+    $start = $max_len / 2;
+    $trunc = $path_len - $max_len;
+    $path  = substr_replace($path, '&hellip;', $start, $trunc);
+  }
+
+  return $host . $path;
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function funnelback_block_info() {
+
+  // Search block.
+  $blocks['search_form'] = array(
+    'info' => t('Funnelback search block'),
+    'cache' => DRUPAL_NO_CACHE,
+    'properties' => array(
+      'administrative' => TRUE,
+    ),
+  );
+
+  $blocks[\Funnelback\Facet::TYPE_TYPE] = array(
+    'info' => t('Funnelback Type Contextual Nav'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+
+  $blocks[\Funnelback\Facet::TOPIC_TYPE] = array(
+    'info' => t('Funnelback Topic Contextual Nav'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+
+  $blocks[\Funnelback\Facet::SITE_TYPE] = array(
+    'info' => t('Funnelback Site Contextual Nav'),
+    'cache' => DRUPAL_NO_CACHE,
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function funnelback_block_view($delta = '') {
+
+  $block = array();
+  switch ($delta) {
+    case 'search_form':
+      if (user_access('use funnelback search')) {
+        $block['subject'] = '';
+        $block['content'] = drupal_get_form('funnelback_search_block_form');
+      }
+      break;
+
+    case \Funnelback\Facet::TYPE_TYPE:
+    case \Funnelback\Facet::TOPIC_TYPE:
+    case \Funnelback\Facet::SITE_TYPE:
+      if (user_access('use funnelback search')) {
+        $block['subject'] = '';
+        $block['content'] = funnelback_contextual_nav_view($delta);
+      }
+      break;
+  }
+
+  return $block;
+}
+
+/**
+ * Search block form callback.
+ *
+ * @ingroup forms
+ */
+function funnelback_search_block_form($form, &$form_state) {
+
+  $form['funnelback_search_field'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Search'),
+    '#title_display' => 'invisible',
+    '#size' => 15,
+    '#default_value' => '',
+    '#attributes' => array('title' => t('Enter the terms you wish to search for.')),
+  );
+
+  $form['funnelback_search_submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Search'),
+  );
+
+  return $form;
+}
+
+/**
+ * Submit callback for search block form.
+ */
+function funnelback_search_block_form_submit($form, &$form_state) {
+
+  $query = check_plain(filter_xss($form_state['values']['funnelback_search_field']));
+
+  // Fixes issues where drupal_goto may not work.
+  if (isset($_GET['destination'])) {
+    unset($_GET['destination']);
+  }
+
+  // Redirect to the search page.
+  drupal_goto('funnelback/search', array(
+    'query' => array('query' => $query),
+  ));
+}
+
+/**
+ * Block callback for contextual navigation.
+ *
+ * @param string $delta
+ *   The type of the contextual navigation.
+ *
+ * @return null|string
+ *   The output.
+ */
+function funnelback_contextual_nav_view($delta) {
+  $response = funnelback_static_response_cache();
+  $output = NULL;
+
+  // Don't show this block if there is NO response.
+  if (empty($response)) {
+    return NULL;
+  }
+
+  $facets = $response->getFacets();
+  if (isset($facets[$delta])) {
+    $facets = $facets[$delta];
+    $summary = $response->getResultsSummary();
+    $query = $response->getQuery();
+
+    $output = theme('funnelback_contextual_nav_block', array(
+      'summary' => $summary,
+      'facets' => $facets,
+      'query' => $query,
+    ));
+  }
+  return $output;
+}
+
+/**
+ * Byte size formatting method.
+ *
+ * @param int $size
+ *   Number of bytes.
+ * @param int $precision
+ *   Number formatting precision.
+ *
+ * @return string
+ *   Formated text.
+ */
+function funnelback_formatBytes($size, $precision = 2) {
+  $base = log($size, 1024);
+  $suffixes = array('', 'k', 'M', 'G', 'T');
+  $key = (string) floor($base);
+  return round(pow(1024, $base - floor($base)), $precision) . $suffixes[$key];
+}
+
+/**
+ * Encode funnelback parameters.
+ *
+ * @param array $params
+ *   Query parameters.
+ * @return string
+ *   URL query string.
+ */
+function funnelback_encode_search_params($params) {
+  return drupal_http_build_query($params);
+}
+
+/**
+ * The allowed url request parameters and mapping.
+ *
+ * @return array
+ *   An array of allow url request parameters and mapping to funnelback parameters.
+ */
+function allowedParameters() {
+  return array(
+    'query' => 'query',
+    'start' => 'start_rank',
+    'clicked_fluster' => 'clicked_fluster',
+    'cluster' => 'cluster',
+    'cluster0' => 'cluster0',
+    'cluster1' => 'cluster1',
+    'cluster2' => 'cluster2',
+    'cluster3' => 'cluster3',
+  );
+}
+
+
+function funnelback_dress_query($query) {
+  $query = str_replace('|u:', ' ', $query);
+  return $query;
+}

@@ -1,0 +1,15 @@
+name: dcmap-d7
+recipe: drupal7
+config:
+  webroot: htdocs
+services:
+  database:
+    type: mysql:5.7
+    creds:
+      user: drupal7
+      password: drupal7
+      database: drupal7
+    portforward: true
+  appserver:
+    type: php:7.3
+    via: apache:2.4

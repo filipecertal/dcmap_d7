@@ -1,0 +1,11 @@
+name = aGov Core
+package = aGov core
+description = Provides common functionality required by other aGov modules
+core = 7.x
+
+; Information added by Drupal.org packaging script on 2015-12-09
+version = "7.x-3.0"
+core = "7.x"
+project = "agov"
+datestamp = "1449637755"
+

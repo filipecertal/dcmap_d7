@@ -1,0 +1,15 @@
+name = Contact
+description = Provides Contact Us functionality.
+core = 7.x
+package = aGov
+php = 5.2.4
+project = agov_contact
+dependencies[] = contact
+files[] = agov_contact.admin.inc
+
+; Information added by Drupal.org packaging script on 2015-12-09
+version = "7.x-3.0"
+core = "7.x"
+project = "agov"
+datestamp = "1449637755"
+

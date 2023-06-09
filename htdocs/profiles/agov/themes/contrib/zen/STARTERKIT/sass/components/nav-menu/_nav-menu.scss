@@ -1,0 +1,85 @@
+// Nav menu
+//
+// A "nav menu" is secondary, hierarchical navigation which can be displayed to the
+// side or below the main content.
+//
+// Markup: nav-menu.hbs
+//
+// Style guide: components.navigation.nav-menu
+
+.nav-menu,
+%nav-menu {
+
+  &__item {
+    list-style-image: image-url('nav-menu/leaf.svg');
+    list-style-type: square;
+
+    @if support-for(ie, 8) {
+      .lt-ie9 & {
+        list-style-image: image-url('nav-menu/leaf.png');
+      }
+    }
+
+    &.is-expanded,
+    &--is-expanded {
+      list-style-image: image-url('nav-menu/expanded.svg');
+      list-style-type: circle;
+
+      @if support-for(ie, 8) {
+        .lt-ie9 & {
+          list-style-image: image-url('nav-menu/expanded.png');
+        }
+      }
+    }
+
+    &.is-collapsed,
+    &--is-collapsed {
+      list-style-image: image-url('nav-menu/collapsed.svg');
+      list-style-type: disc;
+
+      @if support-for(ie, 8) {
+        .lt-ie9 & {
+          list-style-image: image-url('nav-menu/collapsed.png');
+        }
+      }
+
+      @include rtl() {
+        list-style-image: image-url('nav-menu/collapsed-rtl.svg');
+
+        @if support-for(ie, 8) {
+          .lt-ie9 & {
+            list-style-image: image-url('nav-menu/collapsed-rtl.png');
+          }
+        }
+      }
+    }
+  }
+
+  &__link {
+    &.is-active,
+    &--is-active {
+      color: color(menu-active);
+    }
+  }
+}
+
+//
+// Drupal selectors.
+//
+
+.menu__item {
+  @extend %nav-menu__item;
+
+  &.is-expanded {
+    @extend %nav-menu__item--is-expanded;
+  }
+
+  &.is-collapsed {
+    @extend %nav-menu__item--is-collapsed;
+  }
+}
+
+// The active item in a Drupal menu.
+.menu a.active {
+  @extend %nav-menu__link--is-active;
+}
