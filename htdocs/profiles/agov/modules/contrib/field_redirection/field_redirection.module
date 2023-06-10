@@ -49,8 +49,8 @@ function field_redirection_field_formatter_info() {
   );
 }
 
-/*
- * implementation of hook_field_formatter_settings_from().
+/**
+ * Implements hook_field_formatter_settings_from().
  */
 function field_redirection_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
   // Shortcuts to make the rest of the code simpler.
@@ -105,7 +105,13 @@ function field_redirection_field_formatter_settings_form($field, $instance, $vie
     '#type' => 'textarea',
     '#title' => t('Paths'),
     '#default_value' => empty($settings['pages']) ? '' : $settings['pages'],
-    '#description' => t("Enter one page per line as Drupal paths. The '*' character is a wildcard. Example paths are 'blog' for the blog page and 'blog/*' for every personal blog. '<front>' is the front page. You can also use tokens in this field, for example 'node/[node:nid]' can be used to define the current node path."),
+    '#description' => t("Enter one page per line as Drupal paths. The '@wildcard' character is a wildcard. Example paths are '@example_blog' for the blog page and '@example_all_personal_blogs' for every personal blog. '@frontpage' is the front page. You can also use tokens in this field, for example '@example_current_node' can be used to define the current node path.", array(
+      '@wildcard' => '*',
+      '@example_blog' => 'blog',
+      '@example_all_personal_blogs' => 'blog/*',
+      '@frontpage' => '<front>',
+      '@example_current_node' => 'node/[node:nid]',
+    )),
     '#states' => array(
       'invisible' => array(
         ':input[name~="page_restrictions"]' => array(
@@ -156,7 +162,7 @@ function field_redirection_field_formatter_settings_summary($field, $instance, $
     );
     if (array_key_exists($view_mode, $bad_modes)) {
       $output .= '<h2>' . t('Danger, Will Robinson!') . '</h2>';
-      $output .= '<p>' . t('The Redirect formatter should not be used with the ":mode" view mode, it works best when used with the ":full" view mode.', array(':mode' => t($bad_modes[$view_mode]), ':full' => t('Full content'))) . '</p>';
+      $output .= '<p>' . t('The Redirect formatter should not be used with the ":mode" view mode, it works best when used with the ":full" view mode.', array(':mode' => $bad_modes[$view_mode], ':full' => t('Full content'))) . '</p>';
     }
     else {
       $output .= '<h3>' . t('Careful now!') . '</h3>';
@@ -169,7 +175,7 @@ function field_redirection_field_formatter_settings_summary($field, $instance, $
   if (!empty($settings['code']) && isset($codes[$settings['code']])) {
     $code = $settings['code'];
   }
-  $output .= t('Redirect method:') . ' ' . $codes[$code];
+  $output .= t('Redirect method: @code', array('@code' => $codes[$code]));
 
   // Indicate if the option is used.
   if ($settings['404_if_empty']) {
@@ -187,17 +193,18 @@ function field_redirection_field_formatter_settings_summary($field, $instance, $
 /**
  * The standard HTTP redirection codes that are supported.
  *
- * @return The supported HTTP codes.
+ * @return array
+ *   The supported HTTP codes.
  */
 function field_redirection_http_codes() {
   return array(
-    '300' => t('HTTP status code 300 - rarely used'),
-    '301' => t('HTTP status code 301 - permanently moved (default)'),
-    '302' => t('HTTP status code 302 - rarely used'),
-    '303' => t('HTTP status code 303 - rarely used'),
-    '304' => t('HTTP status code 304 - rarely used'),
-    '305' => t('HTTP status code 305 - rarely used'),
-    '307' => t('HTTP status code 307 - temporarily moved'),
+    '300' => t('300: Multiple Choices (rarely used)'),
+    '301' => t('301: Moved Permanently (default)'),
+    '302' => t('302: Found (rarely used)'),
+    '303' => t('303: See Other (rarely used)'),
+    '304' => t('304: Not Modified (rarely used)'),
+    '305' => t('305: Use Proxy (rarely used)'),
+    '307' => t('307: Temporary Redirect (temporarily moved)'),
   );
 }
 
@@ -220,7 +227,7 @@ function field_redirection_field_formatter_view($entity_type, $entity, $field, $
     // Do raw token replacements.
     $pages = token_replace($settings['pages'], array($entity_type => $entity), array('clear' => 1, 'sanitize' => 0));
 
-    // Normalise all paths to lower case
+    // Normalise all paths to lower case.
     $pages = drupal_strtolower($pages);
     $path_alias = drupal_strtolower(drupal_get_path_alias($_GET['q']));
     $page_match = drupal_match_path($path_alias, $pages);
@@ -229,11 +236,10 @@ function field_redirection_field_formatter_view($entity_type, $entity, $field, $
     }
 
     // Stop processing if the page restrictions have matched.
-    if ($page_restrictions xor $page_match) {
+    if (!($page_restrictions xor $page_match)) {
       return;
     }
   }
-
 
   // Don't execute if running via the CLI, e.g. Drush.
   if (constant('PHP_SAPI') == 'cli') {
@@ -282,9 +288,8 @@ function field_redirection_field_formatter_view($entity_type, $entity, $field, $
         }
         break;
 
-      // File field from the core File module.
+      // Fields from the core Image and File modules.
       case 'file':
-      // Image field from the core Image module.
       case 'image':
         if (!empty($item['uri'])) {
           $path = file_create_url($item['uri']);
@@ -302,7 +307,7 @@ function field_redirection_field_formatter_view($entity_type, $entity, $field, $
             $options['query'] = $item['query'];
           }
 
-          // Optional fragment
+          // Optional fragment.
           if (!empty($item['fragment'])) {
             $options['fragment'] = $item['fragment'];
           }
@@ -373,7 +378,8 @@ function field_redirection_field_formatter_view($entity_type, $entity, $field, $
 
   // Only proceed if a path was identified.
   if (!empty($path)) {
-    // Use default language to not prepend language prefix if path is absolute without hostname.
+    // Use default language to not prepend language prefix if path is absolute
+    // without hostname.
     if ($path[0] == '/') {
       $path = substr($path, 1);
       $options['language'] = language_default();
@@ -387,6 +393,17 @@ function field_redirection_field_formatter_view($entity_type, $entity, $field, $
       if (empty($_SESSION['messages']['warning']) || !in_array($message, $_SESSION['messages']['warning'])) {
         drupal_set_message($message, 'warning');
       }
+      $elements = array();
+      $elements[] = array(
+        '#theme' => 'link',
+        '#text' => t('Redirected location'),
+        '#path' => $path,
+        '#options' => array(
+          'attributes' => array(),
+          'html' => FALSE,
+        ),
+      );
+      return $elements;
     }
     else {
       // If caching this page, add 'Cache-Control' header before redirecting.

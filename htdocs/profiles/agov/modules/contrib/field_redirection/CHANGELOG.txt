@@ -1,3 +1,14 @@
+Field_Redirection 7.x-2.7, 2021-05-18
+-------------------------------------
+#2553699 by Pravin Ajaaz: Improved code to match the Drupal coding standards.
+#2846142 by mparker17: Simplify HTTP Status Code options.
+#2394575 by mparker17, jalpesh: Page restrictions are reversed.
+#2846146 by mparker17: <front> not properly escaped, does not appear in
+  description text.
+#2463179 by cgmonroe, Anybody, DamienMcKenna: Display link on page for bypass
+ -redirect users.
+
+
 Field_Redirection 7.x-2.6, 2014-10-31
 -------------------------------------
 #1979300 by DamienMcKenna, ultimike: Display a warning message in the field

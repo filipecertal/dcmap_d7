@@ -4,9 +4,8 @@ description = "Provide a field formatter to redirect the page to a referenced en
 name = "Field Redirection"
 package = "Fields"
 
-; Information added by Drupal.org packaging script on 2014-10-31
-version = "7.x-2.6"
+; Information added by Drupal.org packaging script on 2021-05-18
+version = "7.x-2.7"
 core = "7.x"
 project = "field_redirection"
-datestamp = "1414779529"
-
+datestamp = "1621363610"
