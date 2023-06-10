@@ -9,14 +9,20 @@
  */
 function toc_filter_init() {
   if (module_exists('ctools')) {
-    drupal_add_js( drupal_get_path('module', 'ctools') . '/js/jump-menu.js', array('type' => 'file', 'every_page' => TRUE));
+    drupal_add_js(drupal_get_path('module', 'ctools') . '/js/jump-menu.js', [
+      'type' => 'file',
+      'every_page' => TRUE,
+    ]);
   }
 
   if (variable_get('toc_filter_smooth_scroll', '1')) {
-    drupal_add_js( drupal_get_path('module', 'toc_filter') . '/toc_filter.js', array('type' => 'file', 'every_page' => TRUE));
-    $settings = array(
+    drupal_add_js(drupal_get_path('module', 'toc_filter') . '/toc_filter.js', [
+      'type' => 'file',
+      'every_page' => TRUE,
+    ]);
+    $settings = [
       'toc_filter_smooth_scroll_duration' => variable_get('toc_filter_smooth_scroll_duration', ''),
-    );
+    ];
     drupal_add_js($settings, 'setting');
   }
 }
@@ -25,15 +31,15 @@ function toc_filter_init() {
  * Implements hook_menu().
  */
 function toc_filter_menu() {
-  $items = array();
-  $items['admin/config/content/toc_filter'] = array(
+  $items = [];
+  $items['admin/config/content/toc_filter'] = [
     'title' => 'TOC filter',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('toc_filter_admin_settings'),
-    'access arguments' => array('administer site configuration'),
+    'page arguments' => ['toc_filter_admin_settings'],
+    'access arguments' => ['administer site configuration'],
     'file' => 'toc_filter.admin.inc',
     'type' => MENU_NORMAL_ITEM,
-  );
+  ];
   return $items;
 }
 
@@ -42,20 +48,20 @@ function toc_filter_menu() {
  */
 function toc_filter_filter_info() {
   if (module_exists('ctools')) {
-    $description = t("Converts &lt;@header_tag&gt; tags to a linked table of contents or jump menu with an optional title. (i.e [TOC:(faq|numbered|jump-menu|menu) (title)]", array('@header_tag' => variable_get('toc_filter_header_tag', 'h3')) );
+    $description = t("Converts &lt;@header_tag&gt; tags to a linked table of contents or jump menu with an optional title. (i.e [TOC:(faq|numbered|jump-menu|menu) (title)]", ['@header_tag' => variable_get('toc_filter_header_tag', 'h3')]);
   }
   else {
-    $description = t("Converts &lt;@header_tag&gt; tags to a linked table of contents with an optional title. (i.e [TOC:(faq|numbered) (title)]", array('@header_tag' => variable_get('toc_filter_header_tag', 'h3')) );
+    $description = t("Converts &lt;@header_tag&gt; tags to a linked table of contents with an optional title. (i.e [TOC:(faq|numbered) (title)]", ['@header_tag' => variable_get('toc_filter_header_tag', 'h3')]);
   }
 
-  $filters['toc_filter'] = array(
+  $filters['toc_filter'] = [
     'title' => t('Table of contents'),
     'description' => $description,
-    'default settings' => array(),
+    'default settings' => [],
     'settings callback' => '_toc_filter_settings_callback',
     'process callback' => '_toc_filter_process_callback',
     'tips callback' => '_toc_filter_tips_callback',
-  );
+  ];
   return $filters;
 }
 
@@ -64,10 +70,10 @@ function toc_filter_filter_info() {
  */
 function _toc_filter_tips_callback($delta, $format, $long = FALSE) {
   if (module_exists('ctools')) {
-    return t("Adding [TOC:(faq|ol|number|ul|bullet|jump-menu|menu) (title)] will generate a table of contents or jump menu linked to all the &lt;@header_tag&gt; tags with an optional title.", array("@header_tag" => variable_get('toc_filter_header_tag', 'h3')));
+    return t("Adding [TOC:(faq|ol|number|ul|bullet|jump-menu|menu) (title)] will generate a table of contents or jump menu linked to all the &lt;@header_tag&gt; tags with an optional title.", ["@header_tag" => variable_get('toc_filter_header_tag', 'h3')]);
   }
   else {
-    return t("Adding [TOC:(faq|ol|number|ul|bullet) (title)] will generate a table of contents linked to all the &lt;@header_tag&gt; tags with an optional title.", array("@header_tag" => variable_get('toc_filter_header_tag', 'h3')));
+    return t("Adding [TOC:(faq|ol|number|ul|bullet) (title)] will generate a table of contents linked to all the &lt;@header_tag&gt; tags with an optional title.", ["@header_tag" => variable_get('toc_filter_header_tag', 'h3')]);
   }
 }
 
@@ -75,12 +81,17 @@ function _toc_filter_tips_callback($delta, $format, $long = FALSE) {
  *  TOC filter processor callback: Convert's <h2> to a linked table of contents.
  */
 function _toc_filter_process_callback($text) {
-  if (stripos($text, '[toc') === FALSE || !preg_match('/(?:<p>)?\s*\[TOC(?::([a-z-]+))?([^\]]+)?\]\s*(?:<\/p>)?/i', $text, $matches) ) {
-    return $text;
+  if (stripos($text, '[toc') === FALSE || !preg_match('/(?:<p>)?\s*\[TOC(?::([a-z-]+))?([^\]]+)?\]\s*(?:<\/p>)?/i', $text, $matches)) {
+    if (variable_get('toc_filter_default_top', '0') === '0') {
+      return $text;
+    }
+    else {
+      return _toc_filter_process_callback('[toc:' . variable_get('toc_filter_default_type', 'ul') . "]\n" . $text);
+    }
   }
 
   // Must track nested filter calls which can be created by drupal_get_form('ctools_jump_menu').
-  static $processing = array();
+  static $processing = [];
   $md5 = md5($text);
   if (isset($processing[$md5])) {
     return $text;
@@ -117,23 +128,27 @@ function _toc_filter_process_callback($text) {
   $header_tag = variable_get('toc_filter_header_tag', 'h3');
   preg_match_all('/(<' . $header_tag . '[^>]*>)(.*?)(<\/' . $header_tag . '>)/is', $text, $header_matches);
 
-  $targets = array();
-  $links = array();
+  $targets = [];
+  $links = [];
 
-  for ($i=0, $len=count($header_matches[0]); $i<$len; $i++) {
+  for ($i = 0, $len = count($header_matches[0]); $i < $len; $i++) {
     $header_match = $header_matches[0][$i];
     $open_tag = $header_matches[1][$i];
     $header_title = $header_matches[2][$i];
+    if (empty($header_title)) {
+      continue;
+    }
+
     $close_tag = $header_matches[3][$i];
     $header_id = preg_replace('/[^-a-z0-9]+/', '-', drupal_strtolower(trim($header_title)));
 
     // Add header class to open tag
-    $open_tag_attributes = toc_filter_parse_tag_attributes($open_tag) + array('class' => '');
+    $open_tag_attributes = toc_filter_parse_tag_attributes($open_tag) + ['class' => ''];
     $open_tag_attributes['class'] .= ((empty($open_tag_attributes['class'])) ? '' : ' ') . ' toc-header toc-header-' . $format;
 
     $header_replace = '<' . $header_tag . drupal_attributes($open_tag_attributes) . '>' .
       '<a name="' . $header_id . '" id="' . $header_id . '" class="toc-bookmark" rel="bookmark" title="' . strip_tags($header_title) . '"></a>' .
-      (($is_numbered) ? '<span class="toc-number">' . ($i+1) . ' .  </span> ':'') .
+      (($is_numbered) ? '<span class="toc-number">' . ($i + 1) . ' .  </span> ' : '') .
       $header_title .
       $close_tag;
 
@@ -142,7 +157,7 @@ function _toc_filter_process_callback($text) {
     $links[] = '<a href="#' . $header_id . '">' . strip_tags($header_title, '<i><em><b><strong><br>') . '</a>';
 
     // Add anchor before header
-    $back_to_top = theme('toc_filter_back_to_top', array('class' => ($i == 0) ? 'first' : ''));
+    $back_to_top = theme('toc_filter_back_to_top', ['class' => ($i == 0) ? 'first' : '']);
     $text = str_replace($header_match, $back_to_top . $header_replace, $text);
   }
 
@@ -153,12 +168,20 @@ function _toc_filter_process_callback($text) {
 
   // Theme list
   $links_list_type = ($is_numbered) ? 'ol' : 'ul';
-  $toc_content = theme('item_list', array('items' => $links, 'title' => check_plain($title), 'type' => $links_list_type, 'attributes' => array('class' => 'toc-filter-links')));
-  $output = theme('toc_filter', array('type' => $type, 'content' => $toc_content));
+  $toc_content = theme('item_list', [
+    'items' => $links,
+    'title' => check_plain($title),
+    'type' => $links_list_type,
+    'attributes' => ['class' => 'toc-filter-links'],
+  ]);
+  $output = theme('toc_filter', [
+    'format' => $format,
+    'content' => $toc_content,
+  ]);
 
   // Add jump menu with noscript list.
   if ($format == 'jump_menu' && module_exists('ctools')) {
-    $options = array();
+    $options = [];
     if ($title) {
       $options['choose'] = check_plain($title);
     }
@@ -175,11 +198,11 @@ function _toc_filter_process_callback($text) {
   // Prepend #top
   $output = '<a name="top"></a>' . $output;
 
-    // Replace matched text with output.
+  // Replace matched text with output.
   $text = str_replace($match, $output, $text);
 
   // Add closing back to top.
-  $text .= theme('toc_filter_back_to_top', array('class' => 'last'));
+  $text .= theme('toc_filter_back_to_top', ['class' => 'last']);
 
   unset($processing[$md5]);
 
@@ -190,17 +213,16 @@ function _toc_filter_process_callback($text) {
  * TOC filter settings callback.
  */
 function _toc_filter_settings_callback() {
-  $form = array();
-  $form['toc_filter_settings'] = array(
+  $form = [];
+  $form['toc_filter_settings'] = [
     '#type' => 'fieldset',
     '#title' => t('TOC filter'),
-    '#description' => t('To configure this filter, please goto the global <a href="@href">TOC filter site configuration form</a>.', array('@href' => url('admin/config/content/toc_filter'))),
+    '#description' => t('To configure this filter, please goto the global <a href="@href">TOC filter site configuration form</a>.', ['@href' => url('admin/config/content/toc_filter')]),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
-  );
+  ];
   return $form;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Utility functions
@@ -211,13 +233,12 @@ function _toc_filter_settings_callback() {
  */
 function toc_filter_parse_tag_attributes($tag) {
   preg_match_all('/(\w+)\s*=\s*"([^"]+)"/', $tag, $matches);
-  $attributes = array();
-  for ($i=0, $len=count($matches[1]); $i < $len; $i++) {
-    $attributes[ $matches[1][$i] ] = htmlspecialchars_decode($matches[2][$i], ENT_QUOTES);
+  $attributes = [];
+  for ($i = 0, $len = count($matches[1]); $i < $len; $i++) {
+    $attributes[$matches[1][$i]] = htmlspecialchars_decode($matches[2][$i], ENT_QUOTES);
   }
   return $attributes;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Theme functions
@@ -227,19 +248,19 @@ function toc_filter_parse_tag_attributes($tag) {
  * Implements hook_theme().
  */
 function toc_filter_theme() {
-  return array(
-    'toc_filter' => array(
-      'variables' => array(
+  return [
+    'toc_filter' => [
+      'variables' => [
         'format' => '',
         'content' => '',
-      ),
-    ),
-    'toc_filter_back_to_top' => array(
-      'variables' => array(
+      ],
+    ],
+    'toc_filter_back_to_top' => [
+      'variables' => [
         'class' => '',
-      ),
-    ),
-  );
+      ],
+    ],
+  ];
 }
 
 /**
