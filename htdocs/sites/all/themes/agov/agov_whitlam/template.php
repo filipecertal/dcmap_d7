@@ -30,7 +30,7 @@ function agov_whitlam_preprocess_maintenance_page(&$variables, $hook) {
  * Implements hook_preprocess_html().
  */
 function agov_whitlam_preprocess_html(&$variables, $hook) {
-	
+
 	//Add cookie manager to site. AJR 12/1/21
 	//Add here to load before Google Analytics etc.
     $cookiepro = array(
@@ -41,9 +41,9 @@ function agov_whitlam_preprocess_html(&$variables, $hook) {
 function OptanonWrapper() { }
 </script>' . "\n"
    );
-    drupal_add_html_head($cookiepro, 'cookiepro_banner');
-	
-	
+   // drupal_add_html_head($cookiepro, 'cookiepro_banner');
+
+
   // Add google fonts.
   drupal_add_html_head_link(array(
     "href" => "//fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700",
