@@ -1,6 +1,6 @@
 // This script is used by the MAINTAINERS to generate the CSS files from the
-// STARTERKIT's Sass files. It's a copy of STARTERKIT/gulpfile.s with the
-// "default" task overridden and the STARTERKIT path added to includePaths.
+// STARTERKIT's Sass files. It's a copy of STARTERKIT/gulpfile.s with a
+// few lines added to the very bottom.
 
 'use strict';
 
@@ -21,7 +21,6 @@ var options = {};
 options.rootPath = {
   project     : __dirname + '/',
   styleGuide  : __dirname + '/styleguide/',
-  starterkit  : path.resolve('../STARTERKIT') + '/',
   theme       : __dirname + '/'
 };
 
@@ -32,18 +31,18 @@ options.theme = {
   js    : options.rootPath.theme + 'js/'
 };
 
-// Set the URL used to access the Drupal website under development.
-options.drupalURL = 'http://localhost';
+// Set the URL used to access the Drupal website under development. This will
+// allow Browser Sync to serve the website and update CSS changes on the fly.
+options.drupalURL = '';
+// options.drupalURL = 'http://localhost';
 
 // Define the node-sass configuration. The includePaths is critical!
 options.sass = {
   importer: importOnce,
   includePaths: [
-    options.rootPath.starterkit + 'sass',
     options.theme.sass,
     options.rootPath.project + 'node_modules/breakpoint-sass/stylesheets',
     options.rootPath.project + 'node_modules/chroma-sass/sass',
-    options.rootPath.project + 'node_modules/sassy-maps/sass',
     options.rootPath.project + 'node_modules/support-for/sass',
     options.rootPath.project + 'node_modules/typey/stylesheets',
     options.rootPath.project + 'node_modules/zen-grids/sass'
@@ -51,19 +50,11 @@ options.sass = {
   outputStyle: 'expanded'
 };
 
-options.sassFiles = [
-  options.theme.sass + '**/*.scss',
-  // Do not open Sass partials as they will be included as needed.
-  '!' + options.theme.sass + '**/_*.scss',
-  // Chroma markup has its own gulp task.
-  '!' + options.theme.sass + 'style-guide/chroma-kss-markup.scss'
-];
-
 // Define which browsers to add vendor prefixes for.
 options.autoprefixer = {
   browsers: [
     '> 1%',
-    'ie 8'
+    'ie 9'
   ]
 };
 
@@ -74,6 +65,8 @@ options.styleGuide = {
     options.theme.css + 'style-guide/'
   ],
   destination: options.rootPath.styleGuide,
+
+  builder: 'builder/twig',
 
   // The css and js paths are URLs, like '/misc/jquery.js'.
   // The following paths are relative to the generated style guide.
@@ -89,11 +82,6 @@ options.styleGuide = {
   title: 'Zen 7.x-6.x Style Guide'
 };
 
-// Define the path to the project's .scss-lint.yml.
-options.scssLint = {
-  yml: options.rootPath.project + '.scss-lint.yml'
-};
-
 // Define the paths to the JS files to lint.
 options.eslint = {
   files  : [
@@ -107,6 +95,7 @@ options.eslint = {
 options.gulpWatchOptions = {};
 // options.gulpWatchOptions = {interval: 1000, mode: 'poll'};
 
+
 // ################################
 // Load Gulp and tools we will use.
 // ################################
@@ -114,26 +103,31 @@ var gulp      = require('gulp'),
   $           = require('gulp-load-plugins')(),
   browserSync = require('browser-sync').create(),
   del         = require('del'),
-  runSequence = require('run-sequence'),
   // gulp-load-plugins will report "undefined" error unless you load gulp-sass manually.
-  sass     = require('gulp-sass');
+  sass        = require('gulp-sass'),
+  kss         = require('kss');
 
 // The default task.
-gulp.task('default', ['styles:production']);
+gulp.task('default', ['build']);
 
 // #################
 // Build everything.
 // #################
-gulp.task('build', ['styles:production', 'styleguide'], function(cb) {
-  // Run linting last, otherwise its output gets lost.
-  runSequence(['lint'], cb);
-});
+gulp.task('build', ['styles:production', 'styleguide', 'lint']);
 
 // ##########
 // Build CSS.
 // ##########
+var sassFiles = [
+  options.theme.sass + '**/*.scss',
+  // Do not open Sass partials as they will be included as needed.
+  '!' + options.theme.sass + '**/_*.scss',
+  // Chroma markup has its own gulp task.
+  '!' + options.theme.sass + 'style-guide/kss-example-chroma.scss'
+];
+
 gulp.task('styles', ['clean:css'], function() {
-  return gulp.src(options.sassFiles)
+  return gulp.src(sassFiles)
     .pipe($.sourcemaps.init())
     .pipe(sass(options.sass).on('error', sass.logError))
     .pipe($.autoprefixer(options.autoprefixer))
@@ -144,7 +138,7 @@ gulp.task('styles', ['clean:css'], function() {
 });
 
 gulp.task('styles:production', ['clean:css'], function() {
-  return gulp.src(options.sassFiles)
+  return gulp.src(sassFiles)
     .pipe(sass(options.sass).on('error', sass.logError))
     .pipe($.autoprefixer(options.autoprefixer))
     .pipe($.size({showFiles: true}))
@@ -154,45 +148,29 @@ gulp.task('styles:production', ['clean:css'], function() {
 // ##################
 // Build style guide.
 // ##################
-var flags = [], values;
-// Construct our command-line flags from the options.styleGuide object.
-for (var flag in options.styleGuide) {
-  if (options.styleGuide.hasOwnProperty(flag)) {
-    values = options.styleGuide[flag];
-    if (!Array.isArray(values)) {
-      values = [values];
-    }
-    for (var i = 0; i < values.length; i++) {
-      flags.push('--' + flag + '=\'' + values[i] + '\'');
-    }
-  }
-}
-gulp.task('styleguide', ['clean:styleguide', 'styleguide:chroma-kss-markup'], $.shell.task(
-  ['kss-node <%= flags %>'],
-  {templateData: {flags: flags.join(' ')}}
-));
+gulp.task('styleguide', ['clean:styleguide', 'styleguide:kss-example-chroma'], function() {
+  return kss(options.styleGuide);
+});
 
-gulp.task('styleguide:chroma-kss-markup', function() {
-  return gulp.src(options.theme.sass + 'style-guide/chroma-kss-markup.scss')
+gulp.task('styleguide:kss-example-chroma', function() {
+  return gulp.src(options.theme.sass + 'style-guide/kss-example-chroma.scss')
     .pipe(sass(options.sass).on('error', sass.logError))
     .pipe($.replace(/(\/\*|\*\/)\n/g, ''))
-    .pipe($.rename('chroma-kss-markup.hbs'))
+    .pipe($.rename('kss-example-chroma.twig'))
     .pipe($.size({showFiles: true}))
     .pipe(gulp.dest(options.theme.css + 'style-guide'));
 });
 
 // Debug the generation of the style guide with the --verbose flag.
-gulp.task('styleguide:debug', ['clean:styleguide', 'styleguide:chroma-kss-markup'], $.shell.task(
-  ['kss-node <%= flags %>'],
-  {templateData: {flags: flags.join(' ') + ' --verbose'}}
-));
+gulp.task('styleguide:debug', ['clean:styleguide', 'styleguide:kss-example-chroma'], function() {
+  options.styleGuide.verbose = true;
+  return kss(options.styleGuide);
+});
 
 // #########################
 // Lint Sass and JavaScript.
 // #########################
-gulp.task('lint', function(cb) {
-  runSequence(['lint:js', 'lint:sass'], cb);
-});
+gulp.task('lint', ['lint:sass', 'lint:js']);
 
 // Lint JavaScript.
 gulp.task('lint:js', function() {
@@ -212,14 +190,16 @@ gulp.task('lint:js-with-fail', function() {
 // Lint Sass.
 gulp.task('lint:sass', function() {
   return gulp.src(options.theme.sass + '**/*.scss')
-    .pipe($.scssLint({'bundleExec': true, 'config': options.scssLint.yml}));
+    .pipe($.sassLint())
+    .pipe($.sassLint.format());
 });
 
 // Lint Sass and throw an error for a CI to catch.
 gulp.task('lint:sass-with-fail', function() {
   return gulp.src(options.theme.sass + '**/*.scss')
-    .pipe($.scssLint({'bundleExec': true, 'config': options.scssLint.yml}))
-    .pipe($.scssLint.failReporter());
+    .pipe($.sassLint())
+    .pipe($.sassLint.format())
+    .pipe($.sassLint.failOnError());
 });
 
 // ##############################
@@ -228,6 +208,9 @@ gulp.task('lint:sass-with-fail', function() {
 gulp.task('watch', ['browser-sync', 'watch:lint-and-styleguide', 'watch:js']);
 
 gulp.task('browser-sync', ['watch:css'], function() {
+  if (!options.drupalURL) {
+    return Promise.resolve();
+  }
   return browserSync.init({
     proxy: options.drupalURL,
     noOpen: false
@@ -241,7 +224,7 @@ gulp.task('watch:css', ['styles'], function() {
 gulp.task('watch:lint-and-styleguide', ['styleguide', 'lint:sass'], function() {
   return gulp.watch([
       options.theme.sass + '**/*.scss',
-      options.theme.sass + '**/*.hbs'
+      options.theme.sass + '**/*.twig'
     ], options.gulpWatchOptions, ['styleguide', 'lint:sass']);
 });
 
@@ -260,7 +243,7 @@ gulp.task('clean:styleguide', function() {
   return del([
       options.styleGuide.destination + '*.html',
       options.styleGuide.destination + 'public',
-      options.theme.css + '**/*.hbs'
+      options.theme.css + '**/*.twig'
     ], {force: true});
 });
 
@@ -277,3 +260,8 @@ gulp.task('clean:css', function() {
 // - https://github.com/google/web-starter-kit/blob/master/gulpfile.babel.js
 // - https://github.com/dlmanning/gulp-sass/blob/master/README.md
 // - http://www.browsersync.io/docs/gulp/
+
+
+// Overrides for the Zen base theme version of this file.
+options.sass.includePaths.unshift(path.resolve('../STARTERKIT') + '/sass');
+gulp.task('default', ['styles:production']);

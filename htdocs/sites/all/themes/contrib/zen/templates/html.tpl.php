@@ -7,10 +7,7 @@
  * @see https://drupal.org/node/1728208
  */
 ?><!DOCTYPE html>
-<!--[if lte IE 8]><html class="lt-ie10 lt-ie9" <?php print $html_attributes; ?>><![endif]-->
-<!--[if IE 9]><html class="lt-ie10" <?php print $html_attributes; ?>><![endif]-->
-<!--[if (gt IE 9)|(gt IEMobile 7)]><!--><html <?php print $html_attributes . $rdf_namespaces; ?>><!--<![endif]-->
-
+<html <?php print $html_attributes . $rdf_namespaces; ?>>
 <head>
   <?php print $head; ?>
   <title><?php print $head_title; ?></title>
@@ -32,7 +29,7 @@
 <body class="<?php print $classes; ?>" <?php print $attributes;?>>
   <?php if ($skip_link_text && $skip_link_anchor): ?>
     <p class="skip-link__wrapper">
-      <a href="#<?php print $skip_link_anchor; ?>" class="skip-link visually-hidden--focusable" id="skip-link"><?php print $skip_link_text; ?></a>
+      <a href="#<?php print $skip_link_anchor; ?>" class="skip-link visually-hidden visually-hidden--focusable" id="skip-link"><?php print $skip_link_text; ?></a>
     </p>
   <?php endif; ?>
   <?php print $page_top; ?>

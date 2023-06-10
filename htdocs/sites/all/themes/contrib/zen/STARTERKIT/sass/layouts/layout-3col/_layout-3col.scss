@@ -1,5 +1,3 @@
-// scss-lint:disable DeclarationOrder
-
 // Responsive 3-column grid
 //
 // The `.layout-3col` layout is a responsive grid layout that is:
@@ -45,9 +43,9 @@
 //    this case, the `.layout3-col__grid-item-container` class should be added
 //    to the div to ensure its nested grid items align with the parent grid.
 //
-// Markup: layout-3col.hbs
+// Markup: layout-3col.twig
 //
-// Style guide: layouts.layout-3column
+// Style guide: layouts.layout-3col
 
 .layout-3col,
 %layout-3col {
