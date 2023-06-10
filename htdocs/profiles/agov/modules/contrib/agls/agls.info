@@ -1,12 +1,13 @@
 name = AGLS Metadata tags
-description = Allows users and system to add AGLS meta tags to Drupal pages
-package = Meta tags
+description = Allows users and system to add AGLS meta tags to Drupal pages.
+package = SEO
 core = 7.x
+dependencies[] = metatag (>= 1.6)
 dependencies[] = metatag_dc
+dependencies[] = metatag_dc_advanced
 
-; Information added by drupal.org packaging script on 2013-07-25
-version = "7.x-1.0-beta3"
+; Information added by Drupal.org packaging script on 2021-08-27
+version = "7.x-1.0"
 core = "7.x"
 project = "agls"
-datestamp = "1374789969"
-
+datestamp = "1630067317"

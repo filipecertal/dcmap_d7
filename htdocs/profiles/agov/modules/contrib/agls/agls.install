@@ -1,19 +1,21 @@
 <?php
 /**
  * @file
- * Install file for AGLS.
- *
- * @copyright Copyright(c) 2012 Previous Next Pty Ltd
- * @license GPL v2 http://www.fsf.org/licensing/licenses/gpl.html
- * @author Chris Skene chris at previousnext dot com dot au
+ * Update scripts for the AGLS module.
  */
 
 /**
  * Fix Metatag records for DC and AGLS.
  */
 function agls_update_7001(&$sandbox) {
+  return agls_install_update_tags($sandbox, '_agls_fix_tags_7001', '7001');
+}
 
-  return agls_install_update_tags($sandbox, '_agls_fix_tag_names', '7001');
+/**
+ * Replace AGLSTERMS.isBasisFor and AGLSTERMS.isBasedOn with dcterms.
+ */
+function agls_update_7002(&$sandbox) {
+  return agls_install_update_tags($sandbox, '_agls_fix_tags_7002', '7002');
 }
 
 /**
@@ -22,7 +24,7 @@ function agls_update_7001(&$sandbox) {
  * @param array $sandbox
  *   Batch process sandbox.
  * @param string $batch_callback
- *   Callback to pass individual records to. See _agls_fix_tag_names() for an
+ *   Callback to pass individual records to. See _agls_fix_tags_7001() for an
  *   example.
  * @param string $update_number
  *   The hook_update_N number.
@@ -31,7 +33,6 @@ function agls_update_7001(&$sandbox) {
  *   A message.
  */
 function agls_install_update_tags(&$sandbox, $batch_callback, $update_number) {
-
   // Process records by groups of 20 (arbitrary value).
   // When a group is processed, the batch update engine determines whether it
   // should continue processing in the same request or provide progress
@@ -144,10 +145,9 @@ function agls_install_update_tags(&$sandbox, $batch_callback, $update_number) {
 }
 
 /**
- * Fix tags.
+ * Fix naming of the tags for update 7001.
  */
-function _agls_fix_tag_names($record) {
-
+function _agls_fix_tags_7001($record) {
   if (!empty($record->data)) {
     foreach ($record->data as $tag_name => $tag_data) {
       // Determine if this tag specifies a schema.
@@ -174,7 +174,28 @@ function _agls_fix_tag_names($record) {
 
         $record->data['AGLSTERMS.' . $schema_property] = $tag_data;
       }
+    }
+  }
 
+  return $record;
+}
+
+/**
+ * Fix naming of the tags for update 7002.
+ */
+function _agls_fix_tags_7002($record) {
+  if (!empty($record->data)) {
+    foreach ($record->data as $tag_name => $tag_data) {
+      // Fix 'isBasisFor'.
+      if ($tag_name == 'AGLSTERMS.isBasisFor') {
+        unset($record->data[$tag_name]);
+        $record->data['dcterms.isBasisFor'] = $tag_data;
+      }
+      // Fix 'isBasisFor'.
+      if ($tag_name == 'AGLSTERMS.isBasedOn') {
+        unset($record->data[$tag_name]);
+        $record->data['dcterms.isBasedOn'] = $tag_data;
+      }
     }
   }
 
