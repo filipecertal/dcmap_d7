@@ -8,6 +8,8 @@
  * Implements hook_uninstall().
  */
 function toc_filter_uninstall() {
+  variable_del('toc_filter_default_top');
+  variable_del('toc_filter_default_type');
   variable_del('toc_filter_header_tag');
   variable_del('toc_filter_number_default_title');
   variable_del('toc_filter_bullet_default_title');
@@ -18,13 +20,14 @@ function toc_filter_uninstall() {
 }
 
 /**
- * Change 'toc_filter_ol_default_title' and 'toc_filter_ul_default_title' to 'toc_filter_numbered_default_title' and 'toc_filter_bullet_default_title'
+ * Change 'toc_filter_ol_default_title' and 'toc_filter_ul_default_title' to
+ * 'toc_filter_numbered_default_title' and 'toc_filter_bullet_default_title'
  */
 function toc_filter_update_7103() {
-  $variables = array(
+  $variables = [
     'toc_filter_ol_default_title' => 'toc_filter_number_default_title',
     'toc_filter_ul_default_title' => 'toc_filter_bullet_default_title',
-  );
+  ];
   foreach ($variables as $from => $to) {
     if ($value = variable_get($from, '')) {
       variable_set($to, $value);
