@@ -11,13 +11,16 @@
 // The `<abbr>` element makes the meanings of abbreviations and acronyms visible
 // on hover.
 //
-// Markup: text-abbr.hbs
+// Markup: text-abbr.twig
 //
 // Style guide: base.text.abbr
 
 abbr[title] {
-  // Address styling not present in IE 8/9/10/11, Safari, and Chrome.
-  border-bottom: 1px dotted;
+  // Remove the bottom border in Firefox <40.
+  border-bottom: 0;
+  // Add the correct text decoration in Chrome, Edge, IE, Opera, and Safari.
+  text-decoration: underline;
+  text-decoration: underline dotted;
 
   @media print {
     // Add visible title after abbreviations.
@@ -35,23 +38,32 @@ abbr[title] {
 // Feel free to use `<b>` in HTML5. `<b>` is meant to highlight words or phrases
 // without conveying additional importance.
 //
-// Markup: text-b.hbs
+// Markup: text-b.twig
 //
 // Weight: -1
 //
 // Style guide: base.text.b
 
+// Prevent the duplicate application of `bolder` by the next rule in Safari 6.
+
 b,
 strong {
-  // Address style set to `bolder` in Firefox 4+, Safari, and Chrome.
-  font-weight: bold;
+  font-weight: inherit;
 }
+
+// sass-lint:disable no-mergeable-selectors
+strong,
+b {
+  // Add the correct font weight in Chrome, Edge, and Safari.
+  font-weight: bolder;
+}
+// sass-lint:enable no-mergeable-selectors
 
 // Cite
 //
 // The `<cite>` element represents a reference to a creative work.
 //
-// Markup: text-cite.hbs
+// Markup: text-cite.twig
 //
 // Style guide: base.text.cite
 
@@ -66,22 +78,27 @@ cite {
 // output from a program or computing system. The `<kbd>` element represents
 // user input (typically keyboard input.)
 //
-// Markup: text-code.hbs
+// Markup: text-code.twig
 //
 // Style guide: base.text.code
 
+%monospace,
 code,
 kbd,
 samp,
 var {
-  @extend %monospace;
+  // Correct the inheritance and scaling of font size in all browsers.
+  // The font-family value ends with ", serif".
+  @include typeface(monospace);
+  // Correct the odd `em` font sizing in all browsers.
+  font-size: 1em;
 }
 
 // Deleted text
 //
 // The `<del>` element indicates blocks of text that have been deleted.
 //
-// Markup: text-del.hbs
+// Markup: text-del.twig
 //
 // Style guide: base.text.del
 
@@ -93,12 +110,12 @@ del {
 //
 // The `<dfn>` element represents the defining instance of a term.
 //
-// Markup: text-dfn.hbs
+// Markup: text-dfn.twig
 //
 // Style guide: base.text.dfn
 
 dfn {
-  // Address styling not present in Safari and Chrome.
+  // Add the correct font style in Android <4.4.
   font-style: italic;
 }
 
@@ -110,7 +127,7 @@ dfn {
 // Feel free to use `<i>` element in HTML5. `<i>` is meant to convey voice,
 // technical terms, etc.
 //
-// Markup: text-i.hbs
+// Markup: text-i.twig
 //
 // Weight: -1
 //
@@ -125,7 +142,7 @@ em {
 //
 // The `<ins>` element indicates additions to the document.
 //
-// Markup: text-ins.hbs
+// Markup: text-ins.twig
 //
 // Style guide: base.text.ins
 
@@ -138,16 +155,14 @@ ins {
 // The `<mark>` element highlights a run of text due to its relevance in another
 // context.
 //
-// Markup: text-mark.hbs
+// Markup: text-mark.twig
 //
 // Style guide: base.text.mark
 
-@if support-for(ie, 9) {
-  mark {
-    // Address styling not present in IE 8/9.
-    background: color(mark-bg);
-    color: color(text);
-  }
+mark {
+  // Add the correct background and color in IE <10.
+  background-color: color(mark-bg);
+  color: color(text);
 }
 
 // Quote
@@ -155,7 +170,7 @@ ins {
 // The `<q>` element represents an inline quote from another source. Longer
 // quotes should use the `<blockquote>` element.
 //
-// Markup: text-q.hbs
+// Markup: text-q.twig
 //
 // Style guide: base.text.q
 
@@ -167,7 +182,7 @@ q {
 //
 // The `<s>` element indicates blocks of text that are no longer relevant.
 //
-// Markup: text-s.hbs
+// Markup: text-s.twig
 //
 // Style guide: base.text.s
 
@@ -180,12 +195,12 @@ s {
 // For de-emphasizing inline or blocks of text, use the `<small>` element to set
 // text at 80% the size of the parent.
 //
-// Markup: text-small.hbs
+// Markup: text-small.twig
 //
 // Style guide: base.text.small
 
 small {
-  // Address inconsistent and variable font size in all browsers.
+  // Add the correct font size in all browsers.
   @include font-size(s);
 }
 
@@ -194,25 +209,26 @@ small {
 // The `<sup>` element represents a superscript and the `<sub>` element
 // represents a subscript.
 //
-// Markup: text-sub.hbs
+// Markup: text-sub.twig
 //
 // Style guide: base.text.sub
 
 sub,
 sup {
-  // Prevent `sub` and `sup` affecting `line-height` in all browsers.
+  // Prevent `sub` and `sup` elements from affecting the line height in
+  // all browsers.
   @include font-size(xs);
   line-height: 0;
   position: relative;
   vertical-align: baseline;
 }
 
-sup {
-  top: -.5em;
-}
-
 sub {
   bottom: -.25em;
+}
+
+sup {
+  top: -.5em;
 }
 
 // Underlined text
@@ -220,7 +236,7 @@ sub {
 // To underline text use the `<u>` element. Not recommended since underlines are
 // used by web browsers to style hyperlinks.
 //
-// Markup: text-u.hbs
+// Markup: text-u.twig
 //
 // Style guide: base.text.u
 
