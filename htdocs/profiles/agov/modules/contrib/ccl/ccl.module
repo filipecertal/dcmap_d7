@@ -113,14 +113,16 @@ function ccl_contextual_links_view_alter(&$element, $items) {
     $node_cache = ccl_cache_get('ccl_nodes');
 
     // Global elements.
-    foreach ($node_cache['global'] as $id => $link) {
-      if ($processed_link = _ccl_prepare_link($link, $dest, $node)) {
-        $element['#links']['ccl-global-node-' . $id] = $processed_link;
+    if(is_array($node_cache)) {
+      foreach ($node_cache['global'] as $id => $link) {
+        if ($processed_link = _ccl_prepare_link($link, $dest, $node)) {
+          $element['#links']['ccl-global-node-' . $id] = $processed_link;
+        }
       }
     }
 
     // Content Type.
-    if (in_array($node->type, array_keys($node_cache['ct']))) {
+    if (is_array($node_cache['ct']) && in_array($node->type, array_keys($node_cache['ct']))) {
       foreach ($node_cache['ct'][$node->type] as $id => $link) {
         if ($processed_link = _ccl_prepare_link($link, $dest, $node)) {
           $element['#links']['ccl-ct-' . $id] = $processed_link;
@@ -129,7 +131,7 @@ function ccl_contextual_links_view_alter(&$element, $items) {
     }
 
     // Individual nodes.
-    if (in_array($node->nid, array_keys($node_cache['ids']))) {
+    if (is_array($node_cache['ids']) && in_array($node->nid, array_keys($node_cache['ids']))) {
       foreach ($node_cache['ids'][$node->nid] as $id => $link) {
         if ($processed_link = _ccl_prepare_link($link, $dest, $node)) {
           $element['#links']['ccl-node-' . $id] = $processed_link;
@@ -153,7 +155,7 @@ function ccl_cache_get($type) {
     _ccl_update_cache();
     $cache = cache_get($type);
   }
-  return $cache->data;
+  return $cache ? $cache->data : null;
 }
 
 /**
