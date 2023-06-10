@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>http://adwebsites2:8082/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+<url><loc>http://adwebsites2:8082/about-us</loc><lastmod>2017-06-14T17:20Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/terms-use</loc><lastmod>2018-05-30T14:18Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/contact-us</loc><lastmod>2016-10-03T16:01Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/privacy</loc><lastmod>2018-05-30T14:21Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/foi</loc><lastmod>2016-05-10T11:23Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/node/75</loc><lastmod>2018-10-23T15:13Z</lastmod><changefreq>never</changefreq><priority>1.0</priority></url>
+<url><loc>http://adwebsites2:8082/meetings</loc><lastmod>2021-06-04T15:00Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/legislation</loc><lastmod>2018-06-01T08:38Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme</loc><lastmod>2017-06-09T11:05Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/documents/work-plans-annual-reports</loc><lastmod>2022-05-10T13:24Z</lastmod><changefreq>yearly</changefreq></url>
+<url><loc>http://adwebsites2:8082/documents/methodologies</loc><lastmod>2023-04-25T14:35Z</lastmod><changefreq>monthly</changefreq></url>
+<url><loc>http://adwebsites2:8082/documents/publications</loc><lastmod>2022-05-17T16:44Z</lastmod><changefreq>yearly</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/surveys</loc><lastmod>2017-06-08T16:24Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/sampling</loc><lastmod>2017-06-08T15:46Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/socio-economic</loc><lastmod>2017-04-20T17:43Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/socio-economic-data-collection</loc><lastmod>2023-05-02T09:29Z</lastmod><changefreq>yearly</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/aquaculture-production-and-employment-survey</loc><lastmod>2023-05-02T09:31Z</lastmod><changefreq>yearly</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/sampling/demersal-sampling</loc><lastmod>2019-05-15T11:48Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/sampling/pelagic-sampling</loc><lastmod>2019-05-15T11:50Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/sampling/nephrops-sampling</loc><lastmod>2019-05-15T11:46Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/catch-sampling-programme</loc><lastmod>2019-05-15T09:42Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/data-analysis-and-advice</loc><lastmod>2017-06-12T16:42Z</lastmod><changefreq>never</changefreq></url>
+<url><loc>http://adwebsites2:8082/our-current-programme/biological-sampling-programmes/shellfish-sampling</loc><lastmod>2019-05-15T11:52Z</lastmod><changefreq>never</changefreq></url>
+</urlset>

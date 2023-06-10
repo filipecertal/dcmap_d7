@@ -1,0 +1,383 @@
+IMPORTANT - these files are general examples of the approach taken to raising data.
+If you have any specific questions about what was done for a stock/year you 
+need to speak to us directly.
+
+
+Discard data extraction for ICES WG 
+========================================================
+### Hans Gerritsen, March 2020
+
+Should work with any recent version of R but only 32-bit!
+
+The idea is to use this document as a template and copy the code into your own script file and make the relevant edits neccesary for your stock.
+
+Note that any lines that require user input will be marked with the comment: `#user`
+
+### New in 2020
+We now extract the data by metier, rather than just gear. This means that the file names of the extracted files are a lot longer and messier but it should link up with the landings.
+
+
+Step 0 - Raise data to fleet level
+--------------------------------------------------------
+
+The first step produces an excel file for each stratum for each stock. The strata are generally gear and area, but could also include time (quarters) or selectivity devices. The excel files have the following naming convention:
+
+Species_Area_Gear_Device_Year_Quarter(s)
+
+So: Cod_VIIgVIIj_GNS_DEF_120-219_012_2019_1234.xls Refers to cod in VIIg or VIIj; GNS_DEF_120-219; selectivity devices 0, 1 or 2 (none, panels, grids); Year 2019 and quarters 1, 2, 3 or 4.
+
+The files are in a directory like this: \\Data for ICESWG\\2020\\WGCSE\\_Discards\\DiscardExtractionFiles (subsitute WGCSE for your favourite working group)
+
+There are matching .png files and these should be studied to identify particlarly influential trips or strange lengths `#user`. The .xlsx files can be useful to drill down into the data without having dig into the database. 
+
+The .xlsx files also have the raised length distributions of the discards and landings, using three auxiliary variables: trips, days-at-sea and hours fished. It will be one of thes raised discard length frequency data that is going to be used in step 3.
+
+
+```{r}
+# STEP 1 - Setting up
+library(RODBC)
+library(lattice)
+library(knitr)
+source('/fishdata/Data for ICESWG/2021/Discard functions/ALK functions.R')
+source('/fishdata/Data for ICESWG/2021/Intercatch functions/IntercatchFunctions.R')
+
+# directory where the .xlsx files from step 0 are:
+indir <- '/fishdata/Data for ICESWG/2021/WGCSE/_Discards/DiscardExtractionFiles' #user
+
+# this is the same as the landings code:
+Year <- 2020
+Stock <- 'had.27.7b-k' #user
+path <- paste('/Fishdata/Data for ICESWG/', Year+1, '/WGCSE/', Stock, '/QC', sep = '')
+setwd(path)
+getwd() #user check that the wd is set correctly
+```
+
+```{r,echo=F}
+knitr::opts_knit$set(root.dir = path)
+```
+
+Step 1 - Intercatch file of the landings
+--------------------------------------------------------
+We want to match up the strata (metiers, quarters, divisions) of the discards to the landings. The main reason for this is that intercatch really wants this. If we supply discards and landings that don't match up, then there is a risk that stock coordindators will 'generate' discards again.
+If you have strata with discards but no landings, you will have to edit your landings Intercatch file to include lines with zero landings for those strata
+```{r}
+# read the landings intrcatch file
+land <- ReadIntercatch('../intercatch_had.27.7b-k_landings_age.csv') #user (point to intercatch file of the LANDINGS)
+land1 <- land[[2]][,c(10,3,5,6,8,19)]
+kable(land1) #this is what it looks like
+```
+Step 2 - Sampling Levels
+Read in excel file. The file gives the total number of trips sampled plus the number of trips where the stock was sampled. It also gives the number of hauls sampled for the stock. Three plots are produced and saved in the QC Folder. The first plot compares the total number of trips sampled with the number of trips for which the stocks was sampled. So for example, if you have 6 trips in one metier but your stock was never sampled in that metier, it is likely that discarding is low.  The second plot is the number of discard trips with the stock sampled and the third plot is the number of hauls sampled. All information is displayed by year and gear type.  
+
+```{r}
+library(dplyr)
+library(tidyr)
+library (ggplot2)
+
+# need to run in R 32-bit
+channel <- odbcConnectExcel2007(paste0('/Fishdata/Data for ICESWG/',Year+1,'/WGCSE/_Discards/R Code/SamplingbyStock.xlsx'))
+sampling <- sqlFetch(channel,'Sheet1$')
+close(channel)
+
+## Alternative way of loading the spreadsheet
+#library(XLConnect)
+#wb <- loadWorkbook(paste0('/Fishdata/Data for ICESWG/',Year+1,'/WGCSE/_Discards/R Code/SamplingbyStock.xlsx'))
+## Load in Worksheet
+#sampling <- readWorksheet(wb, sheet=1) 
+samplingstock<-dplyr::filter(sampling,StockName == Stock)
+
+df<-samplingstock %>% select(Gear_type, NumTripsTot, NumTripsSpp, Year) %>%
+  pivot_longer(., cols = c(NumTripsTot, NumTripsSpp), names_to = "Type", values_to = "Number") %>% group_by(Gear_type,Year,Type) %>% summarise(Number = sum(Number))
+#df
+z <-ggplot(df,aes(x=as.factor(Year),y=(Number), fill=Type,group=desc(as.factor(Type)))) +geom_bar(stat="identity",position='dodge', width=NULL)+ facet_wrap(~Gear_type)+ggtitle(paste('Number of At-Sea Trips sampled per Metier' ) )+xlab('Year') +scale_fill_discrete(labels = c( "Trips with Stock sampled","Total Trips")) + 
+  windows() #added this to display plot - SM
+plot(z)
+png(paste0('Total Number of Trips sampled per Metier and Number of Trips with ',Stock,' samples in ',Year,'.png'),8,8,'in',res=600);plot(z); dev.off() 
+
+x <-ggplot(samplingstock,aes(x=as.factor(Year),y=NumTripsSpp)) +geom_bar(stat="identity",fill='blue',width=NULL)+ facet_wrap(~Gear_type)+ggtitle(paste('Number of Trips for which', Stock,'was sampled' ))+xlab('Year')
+windows() #added this to display plot - SM
+plot(x)
+png(paste0('Number of Discard Trips with ',Stock,' samples in ',Year,'.png'),8,8,'in',res=600); plot(x); dev.off()
+
+g <-ggplot(samplingstock,aes(x=as.factor(Year),y=NumHaulsSpp)) +geom_bar(stat="identity",fill='blue',width=NULL)+ facet_wrap(~Gear_type)+ggtitle(paste('Number of Hauls for which', Stock,'was sampled' ) )+xlab('Year')
+windows() #added this to display plot - SM
+plot(g)
+png(paste0('Number of Discard Hauls with ', Stock,' samples in ',Year,'.png'),8,8,'in',res=600); plot(g); dev.off()
+```
+
+Step 3 - Excel files with the discards
+--------------------------------------------------------
+
+Select the input files for your stock, e.g. had in 7b-k has discard data for OTB VIIg; OTB VIIj, GN in VIIgj, SSC in VIIgj and TBB in VIIgj. You can manually define them below or use some smart 'regular expressions' e.g. by using grep().
+
+```{r}
+# Manual list of files
+files <-c("Haddock_VIIbVIIcVIIk_OTB_CRU_100-119OTB_CRU_70-99_012_2020_1234.xlsx", 
+  "Haddock_VIIbVIIcVIIk_OTB_DEF_100-119OTB_DEF_70-99_012_2020_1234.xlsx", 
+  "Haddock_VIIfVIIg_GNS_DEF_120-219_012_2020_1234.xlsx",
+  "Haddock_VIIfVIIg_OTB_CRU_100-119OTB_CRU_70-99_012_2020_1234.xlsx", 
+  "Haddock_VIIfVIIg_OTB_DEF_100-119OTB_DEF_70-99_012_2020_1234.xlsx", 
+  "Haddock_VIIfVIIg_SSC_DEF_100-119_012_2020_1234.xlsx", 
+  "Haddock_VIIfVIIg_TBB_DEF_70-99_012_2020_1234.xlsx", 
+  "Haddock_VIIhVIIj_GNS_DEF_120-219_012_2020_1234.xlsx", 
+  "Haddock_VIIhVIIj_OTB_DEF_100-119OTB_DEF_70-99_012_2020_1234.xlsx", 
+  "Haddock_VIIhVIIj_SSC_DEF_100-119_012_2020_1234.xlsx")
+ #user
+
+# OR 
+
+allfiles <- list.files(indir,'.xlsx')
+files <-  allfiles[grep('^Haddock.*(VIIb|VIIc|VIIg|VIIj|VIIk)',allfiles)]
+# ^ means: beginning with
+# .* means: any character, repeated any amount of times
+# | means: or
+files # make sure you have all of the relevant files here
+
+# a few more parameters to set up
+rvar <- 'Hour' #user (raising variable: 'Trip', 'Day' or 'Hour')
+type <- 'age' #user (report data by 'age' or 'length')
+species <- land1$Species[1]
+outfile <- paste('../intercatch_',Stock,'_discards_',type,'.csv',sep='') #user (name of intercatch file)
+```
+
+
+Now we apply the ALK (if the data type is age) or simply format the data (if data type is length). This step will produce a dataframe called 'IC' and also some plots in the working directory. The it is worth checking the plots and if there are excessive gaps in the ALK, you can edit the LWA tab in the excel file (only the columns 'Length' (cm); 'Weight' (g); and 'Age' are used). The function will give a warning if there are gaps in the ALK. (These are automatically filled in, but this may not always be appropriate.) **NOTE:** for some reason this only works if you add in the extra data at the top of the the excel spreadsheets (add in extra rows).
+```{r}
+if(type=='length') IC0 <- lenfun(files,indir,species)
+if(type=='age') IC0 <- alkfun(files,indir,species)
+```
+
+Have a look at the output; are there enough trips in each stratum? If there are strata with insufficent trips maybe leave them out (remove from the list of files and start again).
+```{r}
+df <- unique(IC0[,c(4,5,7,11,18,19)])
+names(df)[4:6] <- c('DisTonnes','Trips','NumLength')
+kable(df)
+barchart(NumberCaught~factor(AgeLength)|paste(Fleet,FishingArea),data=IC0,type='h',xlab='Age or Length')
+```
+
+
+
+Step 4 - Match discards to the landings strata
+--------------------------------------------------------
+
+These are the discard strata
+```{r}
+# discard gear/areas
+dis <- with(IC0,sort(unique(paste(Fleet,FishingArea))))
+dis
+```
+
+And these are the landings strata
+```{r}
+#landings gear/areas
+lan <- with(land1,sort(unique(paste(Fleet,FishingArea))))
+lan
+```
+
+Now we need to match each of the discard strata to one or more landings strata. We build up a dataframe called fromto. The column 'from' has the discard strata and 'to' has the landings strata. So the discard stratum 'GNS_DEF_120-219 VIIfVIIg' matches up with the landings strata 'GNS_DEF_120-219_0_0_all 27.7.g'. etc. This is the tricky part, make sure you check you have matched all the discards with landings.
+
+```{r}
+fromto <- NULL
+# user input below
+fromto <- rbind(fromto,data.frame(
+  from="GNS_DEF_120-219 VIIgVIIj",
+  to=lan[grep('^GNS.*(27.7.g|27.7.j)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="OTB_CRU_100-119OTB_CRU_70-99 VIIbVIIc",
+  to=lan[grep('^OTB_CRU.*(27.7.b|27.7.c)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="OTB_CRU_100-119OTB_CRU_70-99 VIIfVIIg",
+  to=lan[grep('^OTB_CRU.*(27.7.f|27.7.g)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="OTB_CRU_100-119OTB_CRU_70-99 VIIhVIIjVIIk",
+  to=lan[grep('^OTB_CRU.*(27.7.h|27.7.j|27.7.k)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="OTB_DEF_100-119OTB_DEF_70-99 VIIbVIIc",
+  to=lan[grep('^OTB_DEF.*(27.7.b|27.7.b)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="OTB_DEF_100-119OTB_DEF_70-99 VIIfVIIg",
+  to=lan[grep('^OTB_DEF.*(27.7.f|27.7.g)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="OTB_DEF_100-119OTB_DEF_70-99 VIIhVIIjVIIk",
+  to=lan[grep('^OTB_DEF.*(27.7.h|27.7.j|27.7.k)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="SSC_DEF_100-119 VIIgVIIj",
+  to=lan[grep('^SSC.*(27.7.g|27.7.j)',lan)]
+  ))
+fromto <- rbind(fromto,data.frame(
+  from="TBB_DEF_70-99 VIIgVIIj",
+  to=lan[grep('^TBB.*(27.7.g|27.7.j)',lan)]
+  ))
+# .* means: any character, repeated any amount of times
+# | means: or
+# note that 27.7.g is actually 27[wildcard]7[wildcard]g but thats ok
+
+kable(fromto)
+```
+
+Now check that everyting matches up: You would expect all discards should have landings, so you would expect all of these to be TRUE
+```{r}
+kable(data.frame(dis,dis %in% fromto$from))
+```
+
+You might not have discard estimates for all landings so if any of these are FALSE make sure you understand why
+```{r}
+kable(data.frame(lan,lan %in% fromto$to))
+```
+
+Now some hocus pocus to split it all out. This bit alloactes the discards to each quarter and matching landings metier/area
+```{r}
+land1$to <- paste(land1$Fleet,land1$FishingArea)
+land1 <- merge(land1,fromto)
+land1$p <- NA
+IC0$from <-paste(IC0$Fleet,IC0$FishingArea)
+IC <- NULL
+for(x in unique(land1$from)) {
+  i <- which(land1$from==x)
+  land1$p[i] <- (land1$CATON[i]+1e-9) / sum(land1$CATON[i]+1e-9) #add small number to avoid divide by zero
+  j <- which(IC0$from==x)
+  if(length(j)>0){
+    for(k in 1:length(i)) {
+      land0 <- land1[i,]
+      p <- land0$p[k]
+      s <- land0$Season[k]
+      f <- land0$Fleet[k]
+      a <- land0$FishingArea[k]
+      IC00 <- IC0[j,]
+      IC00$SeasonType <- 'Quarter'
+      IC00$Season <- s
+      IC00$Fleet <- f
+      IC00$FishingArea <- a
+      IC00$CATON <- p*IC00$CATON
+      IC00$NumberCaught <- p*IC00$NumberCaught
+      IC <- rbind(IC,IC00)
+    }
+  }
+#  IC <- subset(IC,NumberCaught>0)
+}
+
+```
+
+And finally, check that we have not lost or gained anything:
+```{r}
+sum(IC0$NumberCaught * IC0$MeanWeight,na.rm=T)
+sum(IC$NumberCaught * IC$MeanWeight,na.rm=T)
+```
+
+
+Step 5 - Export to intercatch format
+--------------------------------------------------------
+This will produce an intercatch file that the stock coordinator can upload. It also produces an SOP check. The values in the last column should be very close to one.
+```{r}
+save.ic(IC,outfile=outfile)
+```
+
+
+Finally, check how it looks
+```{r,fig.height=8}
+dis <- ReadIntercatch(outfile)
+dis1 <- dis[[3]][,c(5,6,8,12,16,28,29)]
+lan1 <- land[[3]][,c(5,6,8,12,16,28,29)]
+catch <- rbind(dis1,lan1)
+
+#discards in red, landings in blue
+b <- barchart(NumberCaught*MeanWeight~as.factor(AgeLength)|paste(Fleet,FishingArea,Season),groups=CatchCategory,stack=T,data=subset(catch,NumberCaught>0),type='h',xlab='Age or Length',col=c('red','blue'),border=NA,par.strip.text=list(cex=0.5))
+b
+png(paste(Stock,Year,type,'1.png'),1280,720); b; dev.off()
+```
+
+```{r}
+#discards in red, landings in blue
+b <- barchart(NumberCaught*MeanWeight~factor(AgeLength)|paste(Season),groups=CatchCategory,stack=T,data=catch,type='h',xlab='Age or Length',col=c('red','blue'),border=NA,par.strip.text=list(cex=0.5))
+b
+png(paste(Stock,Year,type,'2.png'),1280,720); b; dev.off()
+```
+
+```{r}
+#discards in red, landings in blue
+b <- barchart(NumberCaught*MeanWeight~factor(AgeLength)|paste(Fleet),groups=CatchCategory,stack=T,data=catch,type='h',xlab='Age or Length',col=c('red','blue'),border=NA,par.strip.text=list(cex=0.5))
+b
+png(paste(Stock,Year,type,'3.png'),1280,720); b; dev.off()
+```
+
+```{r}
+#discards in red, landings in blue
+b <- barchart(NumberCaught*MeanWeight~factor(AgeLength)|paste(FishingArea),groups=CatchCategory,stack=T,data=catch,type='h',xlab='Age or Length',col=c('red','blue'),border=NA)
+b
+png(paste(Stock,Year,type,'4.png'),1280,720); b; dev.off()
+```
+
+
+
+
+
+Or: 
+
+Finally, check how it looks (order landings-discards reversed: Landings on bottom, discards on top of stack order in plots)
+```{r,fig.height=8}
+dis <- ReadIntercatch(outfile)
+dis1 <- dis[[3]][,c(5,6,8,12,16,28,29)]
+lan1 <- land[[3]][,c(5,6,8,12,16,28,29)]
+catch <- rbind(dis1,lan1)
+
+# Each combination Fleet, FishingArea, Season
+#discards in red, landings in blue
+catch$CatchCategory <- relevel(catch$CatchCategory,"L")
+
+b <- barchart(NumberCaught*MeanWeight~as.factor(AgeLength)|paste(Fleet,FishingArea,Season),groups=CatchCategory,stack=T,data=subset(catch,NumberCaught>0),type='h',xlab='Age',col=c('blue','red'),border=NA,par.strip.text=list(cex=0.5), main = "Fleet,FishingArea,Season; Age discards in red, landings in blue")
+
+b
+png(paste0(path,"/QC/",Stock,Year,'_Age','_plot_1.png'),1280,720); b; dev.off()
+
+```
+
+
+```{r}
+# By Season
+# discards in red (on top), landings in blue (bottom)
+b <- barchart(NumberCaught*MeanWeight~factor(AgeLength)|paste(Season),groups=(CatchCategory),stack=T,data=catch,type='h',xlab='Age',col=c('blue','red'),border=NA,par.strip.text=list(cex=0.5), main = "Season; Age discards in red, landings in blue")
+b
+png(paste0(path,"/QC/",Stock,Year,'_Age','_plot_2.png'),1280,720); b; dev.off()
+```
+
+
+```{r}
+# By Gear
+# discards in red (on top), landings in blue (bottom)
+b <- barchart(NumberCaught*MeanWeight~factor(AgeLength)|paste(Fleet),groups=(CatchCategory),stack=T,data=catch,type='h',xlab='Age',col=c('blue','red'),border=NA,par.strip.text=list(cex=0.5), main = "Fleet; Age discards in red, landings in blue")
+b
+png(paste0(path,"/QC/",Stock,Year,'_Age','_plot_3.png'),1280,720); b; dev.off()
+```
+
+
+```{r}
+# By FishingArea
+# discards in red (on top), landings in blue (bottom)
+b <- barchart(NumberCaught*MeanWeight~factor(AgeLength)|paste(FishingArea),groups=CatchCategory,stack=T,data=catch,type='h',xlab='Age',col=c('blue','red'),border=NA, main = "FishingArea; Age discards in red, landings in blue")
+b
+png(paste0(path,"/QC/",Stock,Year,'_Age','_plot_4.png'),1280,720); b; dev.off()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

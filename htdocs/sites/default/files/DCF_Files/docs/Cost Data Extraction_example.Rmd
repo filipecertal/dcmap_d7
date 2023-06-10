@@ -1,0 +1,658 @@
+IMPORTANT - these files are general examples of the approach taken to raising data.
+If you have any specific questions about what was done for a stock/year you 
+need to speak to us directly.
+
+
+COST data extraction for ICES WG 
+========================================================
+### Hans Gerritsen, March 2020
+
+The idea is to use this document as a template and copy the code into your own script file and make the relevant edits neccesary for your stock. You can either adapt this markdown document or just pick out the R code and paste it into a blank .R file. If you use R markdown, you need to make sure you set the chunk option eval=FALSE or TRUE in the appropriate chunks. I.e. dont forget to run the right chunks or run the wrong ones.
+
+Note that any lines that require user input will be marked with the comment: `#user`
+
+Step 1 - Install R, load libraries and additional functions
+--------------------------------------------------------
+
+This code works with R versions 3.x. It also mostly works with R 4.x but there may be a bug. Version 3 is probably safest for now.
+
+You just have to install the libraries in \\Fishdata\\Data for ICESWG\\2019\\COST functions\\COST libraries\\R 3.x. In that folder you will fid a short script called InstallCostPackages.R to do this for you.
+
+If you want to save the results into a spreadsheet (step 5) then you need to use the 32-bit version. If you use RStudio, hold down the shift and control keys while starting RStudio and a window will pop up that allows you to select your R version
+
+
+
+```{r,message=F,warning=F}
+# STEP 1 - LOAD LIBRARIES AND ADDITIONAL FUNCTIONS
+
+library(RODBC)
+library(COSTcore)
+library(COSTeda)
+library(COSTdbe)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+source('/fishdata/Data for ICESWG/2021/COST functions/CNAA functions.r') # make sure this points to the 2021 folder!
+```
+
+
+*Optional:* If you are unsure which package versions you have installed, you can run this code to check.
+
+```{r}
+sessionInfo()
+```
+
+
+Step 2 - Load the data in COST format
+--------------------------------------------------------
+
+First set the year and stock. Year is the year for which you want the data to be extracted. The Function `checkstock` will check that your stock exists in the IcesStocks table in the database and if it does, it will give you the stock details - make sure the ICES divisions and species are correct!. 
+
+The ICES divisions are based on those specified in intercatch. A copy of the intercatch stock table exists in Stockman2015_Views.dbo.IntercatchStocks. If you spot a mistake, let me know.
+
+The species are based the following lookup tables: Stockman2015_Views.dbo.IntercatchSpeciesLut and Logbooks_2019xxxx.dbo.IntercatchSpeciesLut. Particularly in the logbooks there might be more than one species linking to one stock, e.g. Gadus morhua and Gadus spp. For meg and monk it gets a bit more complicated because they are often reported as combined species in the logbooks; you will need to do a manual fix if you only want the landings for one species. In any case, check the output of the `checkStock' function carefully.
+
+If the stock does not exist, the `checkStock' function will return a list of valid stock names.
+
+```{r}
+# STEP 2 - LOAD THE DATA IN COST FORMAT
+
+Year <- 2020
+Stock <- 'had.27.7b-k' #user
+checkStock(Stock)
+```
+
+Next set your working directory, (if it doesnt exist, create it yourself). It should be something like this:
+
+\\Fishdata\\Data for ICESWG\\2020\\had\\27.7b-k/QC.
+
+Note that the year refers to the working group year, and not the year for which we extract the data. For WGBIE substritute `'/WGCSE/'` with `'/WGBIE/'`
+If the species code has changed you will have to change the name of the folder on the F-drive.
+```{r}
+path <- paste('/Fishdata/Data for ICESWG/', Year+1, '/WGCSE/', Stock, '/QC', sep = '')
+setwd(path)
+getwd() #user check that the wd is set correctly
+```
+
+```{r,echo=F}
+# this is because knitr doesnt listen to setwd()
+knitr::opts_knit$set(root.dir=path)
+```
+
+Now load the cost data. This function accesses a number of views in the stockman and logbooks databases and creates an object called 'cl' that has the landings information and an object called 'cs' that has the sampling data (trip, haul, sample, length and age tables). See documentation on http://wwz.ifremer.fr/cost for more details. If the data loads ok, you will see a long list of checks for each field in the dataset. (It may take a minute or so to load the data)
+```{r, eval=F}
+#loadCostData(Stock,Year,clObject='cl',csObject='cs') #temp hashed out to make it run quicker
+save(cl,cs,file='CostData.RData')
+```
+
+```{r, echo=F, eval=T}
+# shortcut to make the markdown run quicker
+load('CostData.RData')
+```
+
+
+*Optional:* If you want to have a quick look at your data you can type:
+```{r, eval=FALSE}
+head(cl)
+head(cs)
+```
+
+
+Now check the value of the landings you get against the spreadsheet in \\Fishdata\\Data for ICESWG\\2021 called something like 2007-2018_landings_decs & U10.xls. In this case the difference is negligable and proabably due to rounding. If there is a difference you will need to investigate if this is due to missing ICES divisions or differences between the species (e.g. inclusion of things like Gadus spp.
+```{r}
+sum(cl@cl$landWt)/1000 # record the landings here: 2634.133
+```
+
+
+There are some missing metiers. Below is a manual fill-in what we can in using ManualMetierAssign.sql (many of them are pelagic so irrelevant, some are U10m or foreign vessels; will fall out in the end). Note that not all of these trips had landings of the current stock
+```{r}
+# trips with missing metiers
+trp <- unique(subset(cs@hh,foCatEu6=='MIS_MIS_0_0_0_HC')$trpCode)
+subset(cs@tr,trpCode%in%trp)[,c(6,10,7,11)]
+
+# run the script:
+source('../../../COST functions/MissingMetiers.r')
+
+# remaining trips with missing metiers 
+# ...
+
+trp <- unique(subset(cs@hh,foCatEu6=='MIS_MIS_0_0_0_HC')$trpCode)
+subset(cs@tr,trpCode%in%trp)[,c(6,10,7,11)]
+
+```
+
+
+For angler and megrim the data are extracted for lophius spp and lepidorhombus spp. respectively (i.e. combined species). If you are doing the extraction only for one species, e.g. lophius piscatorius you need to select the sampling data for piscatorius only and you need to apply a correction factor to the landings. Note that you need to used the intercatch species codes: MON for pisc in 78; ANK for bud in 78; ANF for combined anglers in 6; MEG for whiff in 78; LEZ for combined megrims in 6.
+For example if 76% of the Lophius spp. landings are estimated to be L. piscatorius, then you do this:
+```{r, eval=FALSE}
+# angler and megrim only!
+cs <- subSetSpp(cs,'MON') #user
+cl@cl$landWt <- cl@cl$landWt * 0.76 #user
+```
+
+For WGCSE angler and megrim are reported as combined species. In this case you need to re-name the species in the cs object (because sample data are imported as individual species):
+```{r, eval=FALSE}
+# angler and megrim WGCSE only!
+# rename species, need ugly hack to prevent duplicates
+hh <- cs@hh
+hh$staNum <- 998
+cs@hh <- rbind(cs@hh,hh)
+cs@sl$staNum <- ifelse(cs@sl$spp=='MON',999,998)
+cs@sl$spp <- "ANF"  #user
+cs@hl$staNum <- ifelse(cs@hl$spp=='ANK',999,998)
+cs@hl$spp <- "ANF"  #user
+
+```
+
+For species that are reported by length and for which we have no biological sampling (i.e. weights-at-length) you will need to supply length-weight parameters to estimate the sample weights. You also need to create dummy data for the cs@ca slot. In that way you can follow almost exactly the same procedure as the ALK species. What happens is that instead of age data, you populate the ages in the cs@ca slot with lengths, an Age-Length Key then becoms a Length-Length key, which is a convoluted way of raising the data but you have the functionality of merging strata etc.
+
+Below are the a and b values used last year for northern hake. Do not forget to replace these with appropriate values for your stock.
+```{r, eval=FALSE}
+# length-only stocks only! (i.e. stocks with no data in cs@ca)
+a <- -4.989 #user
+b <- 2.97 #user
+cs@ca <- fudgeCA(cs,a,b)
+```
+
+
+For cod, haddock and whiting (NOT plaice) stocks in the Celtic Sea and Irish Sea, the landings from 33E2 and 33E3 are re-assigned from VIIa to VIIg. Make sure to replace `taxon ='HAD'` with the relevant species code!
+
+```{r}
+# cod had whg in VIIa or Celtic Sea only!
+cl2 <- read.csv('../../../COST functions/VIIaVIIgLandCorrection.csv') #is updated now with the 20210322 logbooks snapshot
+cl3 <- subset(cl2,taxon=='HAD') # or: taxon=='COD' or: taxon=='WHG'
+sum(cl3$landWt)/1000 #553.8961
+```
+
+Then for Celtic Sea cod, had or whg stocks re-assign the area from VIIa to VIIg and add the landings to the cl object:
+```{r}
+# Celtic Sea cod, had, whg only!
+cl3$area <- '27.7.g'
+cl@cl <- rbind(cl@cl, cl3)
+```
+
+Or for Irish Sea cod, had or whg stocks subtract them from the existing landings (i.e. make the landings negative), note that because of inconsistencies between the declarations and operations, it is possible to get negative total landings for some strata. This should only be a small amount and if it does happen you can remove them.
+```{r, eval=FALSE}
+# Irish Sea cod, had, whg only!
+cl3$landWt <- -cl3$landWt
+cl@cl <- rbind(cl@cl, cl3)
+# check for negative landings
+aggregate(list(landWt = cl@cl$landWt), list(foCatNat = cl@cl$foCatNat), sum)
+# remove negative landings, e.g. for gillnets
+cl@cl <- subset(cl@cl, foCatNat!="GNS") # user (only if you have any negeative landings!)
+```
+
+Step 3 - Quality control checks
+--------------------------------------------------------
+
+*Optional:* You can check length-weight (`type = 'LW'`) plot and ALK plot (`type = 'ALK'`) for outliers. The ALK plot has some random error on the x-axis to help visualisation. If you set the parameter identify = TRUE then you can click on outliers. The data for these outliers will be saved to outliersLW.csv or ourliersALK.csv in your working directory.
+NOTE: the outliers are not automatically removed, you will need to open the csv files and and fix the problem in the database.
+```{r, eval=FALSE}
+# STEP 3 - Quality CONTROL CHECKS
+
+#windows()
+
+outliers(cs,type='LW',identify=TRUE)
+outliers(cs,type='ALK',identify=TRUE)
+```
+
+```{r,echo=F}
+outliers(cs,type='LW',identify=F)
+outliers(cs,type='ALK',identify=F)
+```
+
+
+*Optional:* Check the length samples. The delta value is the expected weight of each sample divided by its actual weight. The expected weight is based on the number of fish and the shape of the average length distribution. If you set the parameter selection = TRUE then you can click on outliers. Outliers are length distributions that are different from expected **but not necessarily wrong**.
+
+This function can also be handy to eyeball if there are differences in length distributions between the metiers.
+
+The first step fudges some sample weights (substLwCs), the second step sets up a stratification, the third step calculates the delta values, the fourth step plots the deltas, the fifth step saves the outliers and the last steps plot the length distributions of the outliers and save the plot
+
+```{r,eval=F}
+csDelta <- substLwCs(cs,plot=F)
+strDelta <- strIni(timeStrata='quarter',techStrata='foCatEu6')
+deltas <- deltCalc(csDelta,strDelta,sp=cs@hl$spp[1])
+
+# R v4.0 and later convert characters to strings in csDelta
+deltas@outPut$SampDeltaMat <- as.data.frame(as.list(deltas@outPut$SampDeltaMat),stringsAsFactors=TRUE)
+
+delta.out <- plot(deltas,strat1='timeStrata',strat2='techStrata',selection=TRUE)
+saveDelta(delta.out,cs,'outliersLF.csv')
+plot(delta.out)
+```
+
+Once you are happy that the data are ok, you need to validate the data. This will create new objects called 'csv' and 'clv'
+```{r}
+csv <- csDataVal(cs)
+clv <- clDataVal(cl)
+```
+
+Step 4 - Stratification and merging
+--------------------------------------------------------
+If we are stratifying by metier level 6 we need to make sure we have no missing values:
+```{r}
+sum(is.na(clv@cl$foCatEu6)) # should be zero
+sum(is.na(csv@hh$foCatEu6)) # should be zero
+``` 
+
+The function `strIni` sets up the stratification. In the first example below we want to estimate the paramters by ices division (area) and gear (foCatNat). There is no timeStrata which means you will estimates for the whole year. In the second example you stratify by quarter as well. If you want to combine all areas, simply omit the spaceStrata argument. For flatfish stocks we agreed do the extraction on an annual basis (first line), all other stocks on a quarterly basis.
+```{r}
+strD <- strIni(techStrata='foCatEu6', spaceStrata='area') #user (use this one for flatfish stocks)
+# OR:
+strD <- strIni(timeStrata='quarter', techStrata='foCatEu6', spaceStrata='area') #user (use this for other stocks, in some cases you can omit the spacestrata)
+```
+
+*Optional:* Once you have defined your stratification, you can check if your sampling is representative of the landings. Even if you don't stratify by area it is still important to check that our sampling is representative across the divisions. If not, you need to be careful about merging sampling data later on.
+```{r}
+strDplot <- strD # or any other stratification you want to look at
+plot(relativeValue(csv, strDplot, "nbSamp"), relativeValue(clv, strDplot), main=Stock)
+```
+
+If you are happy with the stratification, you need to consolidate the data. This will create two new objects called 'csc' and 'clc'. These objects have time, space and technical fields where you used to have year, quarter and month (time); area, rect and subRect (space); foCatNat, foCatEu5 and foCatEu6 (technical)
+```{r}
+csc <- csDataCons(csv,strD)
+clc <- clDataCons(clv,strD)
+# Bug fix: remove any trips that didn't land the current species or samples without lengths etc
+csc <- subset(csc, PSUid %in% csc@hl$PSUid)
+```
+
+*Optional:* Now look at the distribution of your landings and sampling
+```{r}
+plotLan(clc)
+plotLen(csc)
+plotAge(csc)
+```
+
+
+Have a look at the landings and number of length and age samples. nSamp is the number of length samples; nLen is the number fish measured; nAge is the number of fish aged. (The aged fish will be replicated accross all technical strata; COST assumes that gear does not influence the ALK.
+```{r}
+samplingSummary(clc,csc)
+# To save a copy of this table as csv file
+samsum <- samplingSummary(clc,csc)
+write.csv(samsum,'SampleSummary.csv',row.names=F)
+
+```
+
+You might have a lot of unsampled strata. We will address this by first standardising the metiers.
+
+The code below simply groups the metiers into GNS, SSC, TBB and 4 OTB classes (large and small mesh and CRU and DEF). If you think a different grouping is needed, come and talk to me (HG). You will probably also have MIS_MIS and possibly PTM_SPF
+
+```{r}
+# list of metiers
+with(clc@cl,aggregate(list(tonnes=landWt/1000),list(technical=technical),sum))
+
+# run the script to re-name the metiers
+source('../../../Cost functions/GroupMetiers.r')
+
+# now we have the following metiers:
+with(clc@cl,aggregate(list(tonnes=landWt/1000),list(technical=technical),sum))
+
+```
+
+So now you should only have 4 main OTB metiers (CRU/DEF and large and small mesh) as well as one metier each for GNS, SSC and TBB.You may also have some >120mm OTB and possibly PTM_SPF. If these are relatively small, then dont worry about them.
+
+We do someting similar with the areas. E.g. combine into 3 areas: 7bck, 7defgh and 7j. Make sure this is appropriate for your stock!
+```{r}
+# renaming areas, these are the landings by division
+with(clc@cl,aggregate(list(tonnes=landWt/1000),list(space=space),sum))
+
+# specify which divisions should be renamed, first for OTB
+    fromto <- NULL
+    fromto <- rbind(fromto,data.frame(from=c('27.7.b','27.7.c'),to='27.7.b')) #user
+    fromto <- rbind(fromto,data.frame(from=c('27.7.d','27.7.e','27.7.f','27.7.g'), to='27.7.g')) #user
+    fromto <- rbind(fromto,data.frame(from=c('27.7.h','27.7.j','27.7.k'),to='27.7.j')) #user
+    fromto
+
+# apply the new names:
+clcOTB <- mergeDivisions.clc(subset(clc,substring(technical,1,3)=='OTB'),fromto)
+cscOTB <- mergeDivisions.csc(subset(csc,substring(technical,1,3)=='OTB'),fromto)
+
+# now for GNS, SSC, TBB (and any others) these mostly take place in the Celtic Sea and 7gj are similar
+    fromto <- NULL
+    fromto <- rbind(fromto,data.frame(from=c('27.7.b','27.7.c','27.7.k'),to='27.7.b')) #user
+    fromto <- rbind(fromto,data.frame(from=c('27.7.d','27.7.e','27.7.f','27.7.g','27.7.j','27.7.h'), to='27.7.g')) #user
+    fromto
+
+clcOTH <- mergeDivisions.clc(subset(clc,substring(technical,1,3)!='OTB'),fromto)
+cscOTH <- mergeDivisions.csc(subset(csc,substring(technical,1,3)!='OTB'),fromto)
+
+clc <- rbind2(clcOTB,clcOTH)
+csc <- rbind2(cscOTB,cscOTH)
+
+with(clc@cl,aggregate(list(tonnes=landWt/1000),list(space=space),sum))
+```
+
+Now we should have fewer gaps (but probbably still quite a few left
+```{r}
+samplingSummary(clc,csc)
+```
+
+
+Now have a look at what we have
+```{r}
+cl1 <- clc@cl %>% 
+  group_by(technical,space) %>% 
+  summarise(landWt=sum(landWt/1000),.drop=T)
+hl1 <- csc@hl %>% 
+  mutate(quarter=substring(time,8,9)) %>% 
+  group_by(quarter,technical,space,lenCls,.drop=T) %>% 
+  summarise(lenNum=sum(lenNum)) %>% 
+  arrange(quarter,technical,space,lenCls) %>%
+  group_by(quarter,technical,space) %>%
+  mutate(lenSum=sum(lenNum),lenCum=cumsum(lenNum)/sum(lenNum))
+ca1 <- csc@ca %>% 
+  mutate(quarter=substring(time,8,9)) %>% 
+  group_by(quarter,technical,space,age,.drop=T) %>% 
+  mutate(AgeNum=length(age))
+```
+
+The plot below shows the available length distributions by quarter. Cells with darker backgrounds have the most landings so it is important that we have decent samples for those
+
+```{r}
+g <- ggplot() + 
+  geom_rect(aes(fill=landWt),cl1,xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.9) +
+  scale_fill_gradientn(colours=c("#FFFFFF","#0000FF")) +
+  geom_line(aes(lenCls,lenNum/lenSum,col=quarter),hl1) + 
+  facet_grid(technical~space) +
+  theme(strip.text.y = element_text(angle = 0))
+plot(g)
+png(paste0('grid_lf_',Year,'.png'),6,8,'in',res=600); plot(g); dev.off()
+```
+
+Same for age (but note this is just the sampled numbers not the raised numbers-at-age so do not over-interpret this one)
+```{r}
+g <- ggplot() + 
+  geom_rect(aes(fill=landWt),cl1,xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.9) +
+  scale_fill_gradientn(colours=c("#FFFFFF","#0000FF")) +
+  geom_line(aes(age,AgeNum,col=quarter),ca1) + geom_point(aes(age,AgeNum,col=quarter),ca1) +
+  facet_grid(technical~space)
+plot(g)
+png(paste0('grid_age_',Year,'.png'),6,8,'in',res=600); plot(g); dev.off()
+
+```
+
+
+Another way of looking at it
+```{r,fig.width=8,fig.height=8}
+ss <- samplingSummary(clc,csc)
+ss$text <- with(ss,paste0(round(landWt),'t; n=',nSamples))
+g <- ggplot(ss,aes(space,technical))  + 
+  geom_raster(aes(fill=landWt)) + facet_wrap(~time) + #scale_fill_gradientn(colours=c("#FFFFCC","#FFEDA0","#FED976","#FEB24C","#FD8D3C","#FC4E2A","#E31A1C","#BD0026","#800026")) +
+  scale_fill_gradientn(colours=c("#FFFFFF","#0000FF")) +
+  geom_text(aes(label=text))
+# the main metier to worry about is OTB_DEF_100-119
+plot(g)
+png(paste0('grid_sample_',Year,'.png'),8,8,'in',res=600); plot(g); dev.off()
+
+```
+
+
+In the end you want to end up with sufficient samples in each (time/space/technical) stratum. For strata with minor landings it may be acceptable to have only one or two samples, for major strata, aim for at least 5 samples. if you have zero samples then you can choose to just submit the landings tonnage and then the stock coordinator will have to deal with the gap in the sampling data. If you have a major stratum that you think has insufficient samples you can either delete the sample data for that stratum or you can submit it with a warning. In the past we often borrowed samples from other strata but in 2020 we decided to stop this practice and let the stock coordinator deal with gaps. In 2021 we are in an extraordinary situation with reduced sampling so we may have to revert to 'borrowing' samples from other strata.
+
+```{r}
+s <- samplingSummary(clc,csc)
+s$nSamples <- ifelse(is.na(s$nSamples),0,s$nSamples)
+s$pLandwt <- s$landWt/sum(s$landWt,na.rm=T)
+s$col <- ifelse(s$nSamples<s$pLandwt*25 & s$nSamples>0,'red','black')
+plot(s$pLandwt,s$nSamples,col=s$col,pch=16,xlab='Proportion of total landwt',ylab='Number of samples')
+text(s$pLandwt,s$nSamples,s$nLen,pos=1) # number of lengths
+# draw a line for minimum number of samples
+abline(a=0,b=25,col=2)
+subset(s,col=='red')
+```
+
+In the case of haddock  can we borrow from other areas, quarters or gears?
+
+```{r}
+# other metiers, same area
+ggplot(subset(hl1,space=='27.7.g'),aes(lenCls,lenCum,col=technical)) + 
+  geom_line() + ylab('Cumulative length distribution') +
+  facet_wrap(~quarter)
+
+# other areas, same metier
+ggplot(subset(hl1,technical=='OTB_DEF_100-119_0_0_all'),aes(lenCls,lenCum,col=space)) + 
+  geom_line() + ylab('Cumulative length distribution') +
+  facet_wrap(~quarter)
+
+# other quarters, same metier
+ggplot(subset(hl1,technical=='OTB_DEF_100-119_0_0_all'),aes(lenCls,lenCum,col=quarter)) + 
+  geom_line() + ylab('Cumulative length distribution') +
+  facet_wrap(~space)
+
+```
+
+ Although the length distributions are quite different i think the best approach here is to **combine Q1,2,3 together for OTB_DEF_100-119_0_0_all in 7g**:
+```{r}
+csc <- mergeLengthSamples(clc,csc,technical=='OTB_DEF_100-119_0_0_all' & time%in%c("2020 - 1","2020 - 2","2020 - 3") & space=='27.7.g')
+```
+
+The beam trawl data isnt great either
+```{r}
+ggplot(subset(hl1,technical=='TBB_DEF_70-99_0_0_all'),aes(lenCls,lenCum,col=quarter)) + 
+  geom_line() + ylab('Cumulative length distribution')
+```
+
+Best just **combine all quarters for TBB** (there is only one area)
+```{r}
+csc <- mergeLengthSamples(clc,csc,technical=='TBB_DEF_70-99_0_0_all')
+```
+
+Finally, same story for gillnets
+```{r}
+ggplot(subset(hl1,technical=='GNS_DEF_120-219_0_0_all'),aes(lenCls,lenCum,col=quarter)) + 
+  geom_line() + ylab('Cumulative length distribution')
+```
+
+Best just **combine all quarters for GNS**
+```{r}
+csc <- mergeLengthSamples(clc,csc,technical=='GNS_DEF_120-219_0_0_all')
+```
+
+
+How does it look now? - better I think. OTB_DEF in 7j still isn't great but landings are pretty small.
+```{r}
+hl1 <- csc@hl %>% 
+  mutate(quarter=substring(time,8,9)) %>% 
+  group_by(quarter,technical,space,lenCls,.drop=T) %>% 
+  summarise(lenNum=sum(lenNum)) %>% 
+  arrange(quarter,technical,space,lenCls) %>%
+  group_by(quarter,technical,space) %>%
+  mutate(lenSum=sum(lenNum),lenCum=cumsum(lenNum)/sum(lenNum))
+ggplot() + 
+  geom_rect(aes(fill=landWt),cl1,xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf, alpha = 0.9) +
+  scale_fill_gradientn(colours=c("#FFFFFF","#0000FF")) +
+  geom_line(aes(lenCls,lenNum/lenSum,col=quarter),hl1) + 
+  facet_grid(technical~space) +
+  theme(strip.text.y = element_text(angle = 0))
+```
+
+Now for the age data. ALK data are merged across technical strata but there still might be gaps:
+```{r,fig.width=8,fig.height=6,message=F}
+plotAlk(csc,main=Stock) # pink bars signify gaps
+```
+
+To make things efficient, lets just assume the differences in the alk between areas are minor enough to be ignored and **combine age data from all areas into one but keep quarterly stratification**.
+```{r}
+# just assume no differnces in ALK between areas (and gears)
+csc <- mergeAgeSamples(clc,csc,substring(time,8,9)=='1')
+csc <- mergeAgeSamples(clc,csc,substring(time,8,9)=='2')
+csc <- mergeAgeSamples(clc,csc,substring(time,8,9)=='3')
+csc <- mergeAgeSamples(clc,csc,substring(time,8,9)=='4')
+# and combine all quarters for lengths over 60cm 
+# NOTE this is highly species-specific!
+csc <- mergeAgeSamples(clc,csc,lenCls >= 600)
+
+plotAlk(csc,main=Stock) # pink bars signify remaing gaps
+```
+
+```{r}
+csc <- fillGapsAlk(csc)
+plotAlkFill(csc,main=Stock)
+```
+
+If you have a length-only stock and have fudged the age data, you may now have some gaps if you merged quarters. Don't fill these gaps using `fillGapsAlk` because it would not work correctly, instead you can replicate all fudged age data across quarters (or areas):
+```{r, eval=FALSE}
+# length-only stocks only!
+csc <- mergeAgeSamples(clc, csc, lenCls >0)
+```
+
+Step 5 - Raising the data
+--------------------------------------------------------
+
+Before we can raise the sampling data to the landings, we need to fudge the sample weights. In the same way that stockman does this, we estimate the length-weight relationship for each stratum and then apply this to the length samples to estimate their weights. We also replace the individual weights with the modeled weights to match what used to be done in the stockman extractions. The plot shows the data in black and the modeled weights in red.
+```{r}
+# STEP 5 - RAISING THE DATA
+
+csc <- substLw(csc,plot=T)
+```
+
+Now we need to set up a dbe object which holds the parameter estimates and then sequentially, raise the length samples, estimate the age distribution and the weights-at-age (which go into a separate dbe object). After `RaiseAge()` you may get a warning message saying that some length classes do not exist in the ca table. This may indicate you have gaps remaining in your ALK but if you have run the function fillGapsAlk, there should be no gaps. There is a known bug in the code, so just check the sop in the output spreadsheet, if these are all equal to one, then its ok. (You may also get warning messages saying: `In sqrt(df$var) : NaNs produced`, these are also mostly harmless.
+```{r}
+dbe <- dbeObject(desc=Stock, species=levels(csc@sl$spp), catchCat='LAN', strataDesc=strD, methodDesc='analytical')
+dbe <- RaiseLgth(dbe,csc,clc,taxon=levels(clc@cl$taxon)) 
+dbe <- RaiseAge(dbe,csc,type='fixed')
+dbeW <- dbeObject(desc=Stock,species=levels(csc@sl$spp), param='weight',catchCat='LAN',strataDesc=strD, methodDesc='analytical')
+dbeW <- bpEstim(dbeW,csc,dbe)
+```
+
+Finally, save the output to a spreadsheet. If you have a file with the same name open when you run this, then R will give an error. Run the same line again with a different file name to fix this. ONLY WORKS WITH 32 bit version of R
+```{r, eval=FALSE}
+cnaaOut(clc,csc,dbe,filename=paste('../CostExtraction ',Stock,'.xls', sep=''))
+```
+
+The spreadsheet has the following worksheets
+
+* CNAA1: Landings numbers and weights, aggregated over all technical strata. The raising factor is the raising factor used to account for the unsampled gears
+
+* CNAA2: Landings numbers and weights by gear. Unsampled strata are *not* filled in
+
+* LF: The raised numbers-at-length (with their variance)
+
+* QC: This gives the landings weights, sop (sum of cnaa x cwaa) number of gaps in the ALK, the proportion of the numbers-at-length that have gaps in the ALK and the proportion of the weights-at-length that have gaps in the ALK. And the overall proportion of the weights-at-length that have gaps in the ALK.
+
+* One worksheet for each of the strata with the raised length frequency distribution, ALK and QC information.
+
+Step 6 - Intercatch
+--------------------------------------------------------
+
+First load the functions that produce the intercatch format
+```{r}
+# STEP 6 - INTERCATCH
+
+source('../../../Intercatch functions/IntercatchFunctions.r')
+```
+
+You can create an intercatch input dataframe for the data aggregated over all gears/metiers (corrected for unsampled gears/metiers) by using the function `intercatch.df1()`, alternatively, you can generate the data using the technical stratification specified earlier by using `intercatch.df2()`. In that case, you will have to use foCatEu5 or foCatEu6 as techstrata. Also you need to give some info under InfoGeneral: Describe which divisions and metiers were combined. (its probably wise to avoid colons, semi-colons and tabs in this text string and **VERY IMPORTANT** to avoid commas)
+```{r}
+IC <- intercatch.df2(clc,csc,dbe,InfoGeneral='Explain here which areas were merged')  #user
+```
+
+This year there are a number of aged stocks for which the length data also needs to be uploaded to IC. For this purpose there is a brand-new function called intercatch.df3. This does the same as above but instead of pulling out the age data it takes the length data.
+```{r}
+IC2 <- intercatch.df3(clc,csc,dbe,InfoGeneral='')  #user
+```
+
+
+Here is an example of how to fill in the InfoGeneral field (do the same for IC2 where relevant)
+```{r}
+# OTB
+IC$InfoGeneral <- ifelse(IC$FishingArea=='27.7.b' & substring(IC$Fleet,1,3)=='OTB',
+                         '7bc combined and metiers combined',IC$InfoGeneral)
+IC$InfoGeneral <- ifelse(IC$FishingArea=='27.7.j' & substring(IC$Fleet,1,3)=='OTB',
+                         '7jk combined and metiers combined',IC$InfoGeneral)
+IC$InfoGeneral <- ifelse(IC$FishingArea=='27.7.g' & substring(IC$Fleet,1,3)=='OTB',
+                         '7defgh combined and metiers combined',IC$InfoGeneral)
+# Other gears
+IC$InfoGeneral <- ifelse(IC$FishingArea=='27.7.b' & substring(IC$Fleet,1,3)!='OTB',
+                         '7bck combined and metiers combined',IC$InfoGeneral)
+IC$InfoGeneral <- ifelse(IC$FishingArea=='27.7.j' & substring(IC$Fleet,1,3)!='OTB',
+                         '7defghj combined and metiers combined',IC$InfoGeneral)
+
+```
+
+
+If you have combined all areas, you will need to give intercatch the main division in which the landings were taken. (do the same for IC2 where relevant)
+```{r, eval=FALSE}
+IC$FishingArea <- '27.7.a' #only do this if your FishingArea is 'All'
+IC2$FishingArea <- '27.7.a' #only do this if your FishingArea is 'All'
+```
+
+For megrim and monkfish you will need to check the species code in the `IC` dataframe. Monk is MNZ and megrim is LEZ for WGCSE but monk is MON/ANF and megrim is MEG for WGBIE. To change the species code do this: (do the same for IC2 where relevant)
+```{r, eval=FALSE}
+# for example
+IC$Species <- 'MNZ' #user
+IC2$Species <- 'MNZ' #user
+```
+
+
+For species that are reported by length you should have run the `fudgeCA` function and you now have to tell intercatch you are reporting by length, rather than age:
+```{r, eval=FALSE}
+# only run this line for length-only stocks!
+IC$CANUMtype='lngt'
+IC$UnitAgeOrLength='mm'
+````
+
+Now that we have the input dataframe, we need to convert it to the 3 intercatch tables. Make sure the SOP is close to 1. (you may get 0.999 or 1.001; this is probably rounding).(do the same for IC2 where relevant)
+```{r}
+# age
+HI <- HIfun(IC)
+SI <- SIfun(IC)
+SD <- SDfun(IC)
+plot(SOP(IC)$CATON,SOP(IC)$SOPcheck)
+
+# length
+HI2 <- HIfun(IC2)
+SI2 <- SIfun(IC2)
+SD2 <- SDfun(IC2)
+```
+
+SOP(IC) checks the sum-of-products against the landings, values should be very close to one, for missing data inf values will result. This is ok
+
+Finally, create the output file, it will be called intercatch_[stockname].csv. To load this into intercatch, log in; click on data handling (topleft), select 2. Import and Data Check; browse to the csv file; under data format, select "intercatch 1. Version"; press submit and hope for the best.(do the same for IC2 where relevant)
+
+```{r}
+out <- c(do.call('pastefun',HI)
+  ,do.call('pastefun',SI)
+  ,do.call('pastefun',SD)
+)
+# write the output file
+fileOut <- paste('../intercatch_',Stock,'_landings_age.csv',sep='')
+write.table(out,fileOut,quote=F,row.names=F,col.names=F)
+
+
+out <- c(do.call('pastefun',HI2)
+  ,do.call('pastefun',SI2)
+  ,do.call('pastefun',SD2)
+)
+# write the output file
+fileOut <- paste('../intercatch_',Stock,'_landings_length.csv',sep='')
+write.table(out,fileOut,quote=F,row.names=F,col.names=F)
+
+```
+
+Step 7 - Sanity checks
+--------------------------------------------------------
+
+Check that the landings in the cl object match the landings in the intercatch file. Also check that the weight of the sampled landings in the dbe object is the same as the SOP of the intercatch data. Note that if there is a large difference between the landings and the sampled landings, you probably have to do some  more fill-ins or check for errors.
+```{r}
+# STEP 7 - SANITY CHECKS
+
+# total landings in cl object
+sum(cl@cl$landWt)/1000
+# total landings in intercatch output (should match total cl landings)
+sum(SI$CATON)
+
+
+# sop in intercatch output (this is only the landings that are actually sampled)
+with(SD,sum(NumberCaught*MeanWeight))
+# landings with sampling data
+sum(dbe@totalW$estim$value)/1000
+# sum of products, should be the same as above
+with(merge(dbe@ageStruc$estim,dbeW@ageStruc$estim,by=c('time','space','technical','age')), sum(value.x*value.y)/1000000 )
+
+```
+
+
+Step 8 - Discards - See: Discard Data Extraction.html
