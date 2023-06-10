@@ -10,9 +10,8 @@ dependencies[] = block
 
 files[] = ccl_blocks.module
 
-; Information added by Drupal.org packaging script on 2017-02-23
-version = "7.x-1.6"
+; Information added by Drupal.org packaging script on 2019-10-14
+version = "7.x-1.7"
 core = "7.x"
 project = "ccl"
-datestamp = "1487858574"
-
+datestamp = "1571088186"
