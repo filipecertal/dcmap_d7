@@ -13,26 +13,21 @@ visibility and availability of online resources.
 Meta tags
 =========================================
 
-aglsterms.availability
-aglsterms.function
-aglsterms.mandate
-
-dcterms.audience
-dcterms.contributor
-dcterms.coverage
-dcterms.creator
-dcterms.date
-dcterms.description
-dcterms.format
-dcterms.identifier
-dcterms.language
-dcterms.publisher
-dcterms.relation
-dcterms.rights
-dcterms.source
-dcterms.subject
-dcterms.title
-dcterms.type
+* AGLSTERMS.act
+* AGLSTERMS.aggregationLevel
+* AGLSTERMS.availability
+* AGLSTERMS.case
+* AGLSTERMS.category
+* AGLSTERMS.dateLicenced
+* AGLSTERMS.documentType
+* AGLSTERMS.function
+* AGLSTERMS.jurisdiction
+* AGLSTERMS.mandate
+* AGLSTERMS.protectiveMarking
+* AGLSTERMS.regulation
+* AGLSTERMS.rightsHolder
+* AGLSTERMS.spatial
+* AGLSTERMS.temporal
 
 
 =========================================
@@ -48,7 +43,8 @@ obligation categories:
 * Conditional
  - aglsterms:availability (mandatory for offline resources)
  - dcterms:identifier (mandatory for online resources)
- - dcterms:publisher (mandatory for information resources - optional for descriptions of services)
+ - dcterms:publisher (mandatory for information resources - optional for
+   descriptions of services)
 * Recommended
  - aglsterms:function (if dcterms:subject is not used)
  - dcterms:description
@@ -77,3 +73,29 @@ http://www.agls.gov.au/pdf/Guide%20to%20expressing%20AGLS%20metadata%20in%20XML%
 
 * Guide to expressing AGLS metadata in rdf:
 http://www.agls.gov.au/pdf/Guide%20to%20expressing%20AGLS%20metadata%20in%20RDF%20v1.0.PDF
+
+
+=========================================
+Credits / Contact
+=========================================
+
+Currently maintained by Damien McKenna [1]. Originally written by Kim Pepper
+[2], with contributions by Nick Schuch [3], Christopher Skene [4] and others in
+the community, with sponsorship by Previous Next Pty Ltd [5], the Australian
+Law Reform Commission [6] and the Australian Department of Families, Housing,
+Community Services and Indigenous Affairs [7].
+
+The best way to contact the authors is to submit an issue, be it a support
+request, a feature request or a bug report, in the project issue queue:
+  https://www.drupal.org/project/issues/agls
+
+
+References
+------------------------------------------------------------------------------
+1: https://www.drupal.org/u/damienmckenna
+2: https://www.drupal.org/u/kim.pepper
+3: https://www.drupal.org/u/nick_schuch
+4: https://www.drupal.org/u/xtfer
+5: https://www.previousnext.com.au
+6: http://www.alrc.gov.au/
+7: https://www.dss.gov.au/
